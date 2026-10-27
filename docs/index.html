@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FMT Assistant</title>
+<meta name="description" content="A Windows companion for the ARRL Frequency Measuring Test using WSJT-X FreqCal: clock, voice prompts, file capture, calibration and mistake checks.">
+<meta property="og:title" content="FMT Assistant">
+<meta property="og:description" content="Measure the carrier, not your mistakes. A Windows companion for the ARRL FMT using WSJT-X FreqCal.">
+<meta property="og:image" content="https://va3mw.github.io/FMTAssistant/icon.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="icon.png" type="image/png">
+<style>
+:root {
+  --bg: #0f1218;
+  --bg2: #151a23;
+  --card: #1a202b;
+  --line: #2a3242;
+  --text: #e3e9f3;
+  --dim: #94a1b8;
+  --faint: #5e6a82;
+  --blue: #3f8cff;
+  --sky: #3fb6ff;
+  --orange: #ff8a3d;
+  --violet: #b48cff;
+  --on: #3ddc84;
+  --amp: #ffc23d;
+  --bad: #ff5468;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.6 "Segoe UI", system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+}
+a { color: var(--sky); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, pre { font-family: "Cascadia Mono", Consolas, ui-monospace, monospace; font-size: 14px; }
+code { background: #ffffff10; padding: 1px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+
+/* ---- hero ---- */
+header {
+  position: relative; padding: 64px 0 40px; text-align: center;
+  background:
+    radial-gradient(600px 300px at 15% 0%, #3f8cff26, transparent 70%),
+    radial-gradient(600px 300px at 85% 10%, #3ddc841f, transparent 70%),
+    radial-gradient(500px 260px at 50% 100%, #ffc23d14, transparent 70%);
+}
+.logo { width: 88px; height: 88px; filter: drop-shadow(0 10px 30px #0008); }
+h1 {
+  font-size: clamp(40px, 7vw, 64px); line-height: 1.05; margin: 16px 0 10px; letter-spacing: -1px;
+  background: linear-gradient(90deg, var(--blue), var(--sky) 50%, var(--on));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.tag { font-size: clamp(18px, 2.6vw, 22px); color: var(--text); margin: 0 auto 8px; max-width: 640px; }
+.sub { color: var(--dim); margin: 0 auto 28px; max-width: 660px; }
+.btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 10px;
+  font-weight: 600; border: 1px solid var(--line); color: var(--text); background: var(--card);
+}
+.btn:hover { text-decoration: none; border-color: var(--sky); }
+.btn.go { background: linear-gradient(135deg, #1d5fd1, #3f8cff); border-color: #3f8cff; color: #fff; box-shadow: 0 8px 24px #3f8cff33; }
+.btn.go:hover { filter: brightness(1.08); }
+.meta { margin-top: 14px; color: var(--faint); font-size: 14px; }
+.pill { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+  color: var(--amp); border: 1px solid #ffc23d55; background: #ffc23d14; border-radius: 99px; padding: 2px 10px; margin-bottom: 10px; }
+
+.shot {
+  margin: 40px auto 0; max-width: 900px; border-radius: 12px; overflow: hidden;
+  border: 1px solid var(--line); box-shadow: 0 30px 80px #000a, 0 0 0 6px #ffffff06; background: #fff;
+}
+.shot img { display: block; width: 100%; height: auto; }
+.bar { height: 30px; background: #1b2130; display: flex; align-items: center; gap: 7px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+.bar i { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; }
+.bar i:nth-child(2) { background: #febc2e; } .bar i:nth-child(3) { background: #28c840; }
+.bar span { margin-left: 8px; color: var(--faint); font-size: 12px; }
+
+/* ---- sections ---- */
+section { padding: 64px 0; }
+section.alt { background: var(--bg2); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+h2 { font-size: 30px; margin: 0 0 8px; letter-spacing: -.3px; }
+.lead { color: var(--dim); margin: 0 0 32px; max-width: 700px; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px;
+  border-top: 3px solid var(--c);
+}
+.card h3 { margin: 0 0 6px; font-size: 17px; display: flex; align-items: center; gap: 10px; }
+.card h3 b { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; font-size: 15px; flex: none;
+  background: color-mix(in srgb, var(--c) 20%, transparent); color: var(--c); }
+.card p { margin: 0; color: var(--dim); font-size: 15px; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; }
+@media (max-width: 760px) { .split { grid-template-columns: 1fr; } }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+.chip { font-size: 13px; padding: 3px 10px; border-radius: 6px; font-weight: 600;
+  color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); }
+
+/* formula */
+.formula { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px; margin: 0 0 18px;
+  font: 600 clamp(17px, 2.4vw, 22px)/1.5 "Cascadia Mono", Consolas, ui-monospace, monospace; text-align: center; }
+.formula .d { color: var(--sky); } .formula .m { color: var(--on); } .formula .c { color: var(--amp); }
+.legend { display: grid; gap: 6px; color: var(--dim); font-size: 15px; }
+.legend b { font-family: "Cascadia Mono", Consolas, monospace; }
+
+/* timeline */
+.timeline { display: grid; gap: 8px; }
+.timeline div { display: grid; grid-template-columns: 74px 1fr; gap: 12px; align-items: baseline;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.timeline time { font-family: "Cascadia Mono", Consolas, monospace; font-weight: 700; color: var(--c, var(--sky)); }
+.timeline span { color: var(--dim); font-size: 15px; }
+.timeline strong { color: var(--text); }
+
+.status { display: grid; gap: 8px; }
+.status div { display: flex; align-items: center; gap: 10px; color: var(--dim); font-size: 14px; }
+.status b { display: inline-block; min-width: 190px; padding: 4px 10px; border-radius: 6px; font-size: 13px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--dim); font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; }
+td:first-child { color: var(--text); font-weight: 600; white-space: nowrap; }
+td { color: var(--dim); }
+.tbl { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
+
+pre { background: #0b0e13; border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; overflow-x: auto; margin: 0 0 16px; color: #cfe3ff; }
+pre .c { color: var(--faint); }
+
+.tested { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.tested div { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.tested b { display: block; }
+.tested span { color: var(--dim); font-size: 14px; }
+.ok { color: var(--on); } .todo { color: var(--amp); } .no { color: var(--bad); }
+
+footer { padding: 36px 0 48px; color: var(--faint); font-size: 14px; text-align: center; }
+footer img { width: 28px; vertical-align: middle; margin-right: 6px; border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <img class="logo" src="icon.svg" alt="">
+    <h1>FMT Assistant</h1>
+    <p class="tag">Measure the carrier, not your mistakes.</p>
+    <p class="sub">A Windows companion for the ARRL Frequency Measuring Test using WSJT-X FreqCal. It keeps the clock, tells you what to do and when, collects your measurement files, and works out each carrier frequency to a hundredth of a hertz, checking for the slips that cost points.</p>
+    <span class="pill">Ready for the November 13, 2026 FMT · open source</span>
+    <div class="btns">
+      <a class="btn go" href="https://github.com/va3mw/FMTAssistant/releases/latest/download/FMTAssistant.exe">⬇ Download for Windows</a>
+      <a class="btn" href="https://github.com/va3mw/FMTAssistant#readme">Full instructions</a>
+      <a class="btn" href="https://github.com/va3mw/FMTAssistant">View on GitHub</a>
+    </div>
+    <div class="meta">Windows 10/11 · single .exe, no installer · works with any radio, FlexRadio optional · free, MIT licensed</div>
+    <div class="shot">
+      <div class="bar"><i></i><i></i><i></i><span>FMT Assistant, test night</span></div>
+      <img src="screenshot-test-night.png" width="1264" height="891" alt="FMT Assistant on the Test night tab: a large UTC clock, a countdown to the next event, the before calibration card, and run cards showing the dial to set for W8RKO and K5CM on 40 m">
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>Everything around WSJT-X</h2>
+    <p class="lead">You still run WSJT-X by hand, exactly as the standard FreqCal procedure describes. FMT Assistant sits beside it and handles the timing, the files, the arithmetic and the double-checking, so you can concentrate on the radio.</p>
+    <div class="grid">
+      <div class="card" style="--c: var(--amp)"><h3><b>◷</b>Clock and voice prompts</h3><p>A big UTC clock and a countdown to the next event. Spoken prompts tell you when to start calibration, the dial to set at each call-up, two minutes and 30 seconds to go, then count down five beeps to key-down and remind you to capture when the carrier ends.</p></div>
+      <div class="card" style="--c: var(--sky)"><h3><b>⌖</b>The dial to set</h3><p>Each run shows the carrier and the USB dial 1500 Hz below it. If the tone lands off 1500 Hz on the waterfall, type where it is and get a corrected dial.</p></div>
+      <div class="card" style="--c: var(--blue)"><h3><b>⤓</b>One-click capture</h3><p><b>Capture</b> copies WSJT-X's <code>fmt.all</code> into the right slot (calibration before, four runs, calibration after) and starts a clean file for the next step. Runs can't get mixed together.</p></div>
+      <div class="card" style="--c: var(--on)"><h3><b>∑</b>WSJT-X-compatible maths</h3><p>The same straight-line calibration fit WSJT-X uses. Weak readings (the <code>*</code> lines) and stations other than WWV are dropped. Each key-down carrier is found automatically, with CW ID and the edges left out.</p></div>
+      <div class="card" style="--c: var(--bad)"><h3><b>!</b>Mistake checks</h3><p>Dial typos, the wrong file in a slot, a file used twice, WSJT-X's own calibration left on, readings from another run, drift between calibrations. Every result says <b>Ready</b> only when it has passed them all.</p></div>
+      <div class="card" style="--c: var(--violet)"><h3><b>↺</b>Practise any evening</h3><p>The <b>Practice</b> tab runs the full routine on your local AM broadcast station or WWV whenever you like, with the same prompts, capture and analysis as test night.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap split">
+    <div>
+      <h2>Test night, step by step</h2>
+      <p class="lead" style="margin-bottom: 18px">Pre-loaded with the November 13, 2026 schedule (UTC). Edit it for future tests. The banner under the clock always says what to do now.</p>
+      <div class="timeline">
+        <div style="--c: var(--on)"><time>0209</time><span><strong>Calibration before:</strong> FreqCal cycle on WWV with Measure checked, then Capture.</span></div>
+        <div><time>0229</time><span><strong>W8RKO 40 m</strong> call-up near 7064 kHz · key-down 0234</span></div>
+        <div><time>0244</time><span><strong>K5CM 40 m</strong> call-up near 7065 kHz · key-down 0249</span></div>
+        <div><time>0259</time><span><strong>W8RKO 80 m</strong> call-up near 3598 kHz · key-down 0304</span></div>
+        <div><time>0314</time><span><strong>K5CM 80 m</strong> call-up near 3599 kHz · key-down 0319</span></div>
+        <div style="--c: var(--on)"><time>0321</time><span><strong>Calibration after:</strong> the same again, to show any drift.</span></div>
+      </div>
+    </div>
+    <div>
+      <h2>Always know the phase</h2>
+      <p class="lead" style="margin-bottom: 18px">The banner changes colour so a glance tells you where you are, and it offers the button you need next.</p>
+      <div class="status">
+        <div><b style="background:#e8f0fe;color:#1d2330">Next: W8RKO 40 m at 0229</b>waiting, with the countdown</div>
+        <div><b style="background:#fff1d6;color:#1d2330">Call-up · set dial 7,062.500</b>set the dial, centre the tone</div>
+        <div><b style="background:#ffe1e1;color:#1d2330">KEY-DOWN · 0:42 left</b>hands off the dial</div>
+        <div><b style="background:#e6f4ea;color:#1a7f37">Ready · 7,064,003.28 Hz</b>a result that passed every check</div>
+      </div>
+      <p class="lead" style="margin: 22px 0 0">Prefer quiet? Voice and beeps can each be switched off, and there's a general-purpose 1 min, 5 min or custom timer in the header.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>The arithmetic, done for you</h2>
+    <p class="lead">With the USB dial about 1500 Hz below the carrier, WSJT-X FreqCal measures the carrier as an audio tone (fMeas). A WWV calibration measures your radio's error as a straight line, A + B × f. The answer is:</p>
+    <div class="formula"><span class="d">dial</span> + <span class="m">mean fMeas</span> − (<span class="c">A + B × f</span>)</div>
+    <div class="legend">
+      <div><b class="d" style="color:var(--sky)">dial</b> · the exact USB dial you used. The app checks it against what WSJT-X logged.</div>
+      <div><b style="color:var(--on)">mean fMeas</b> · the average tone over the key-down minute, without the CW ID, edges or outliers.</div>
+      <div><b style="color:var(--amp)">A + B × f</b> · your radio's error at that frequency, from the calibration before, after, or their average.</div>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>Mistakes it catches</h2>
+    <p class="lead">Red means the result isn't Ready until it's fixed; amber means it's worth a look. Every message says what to do.</p>
+    <div class="tbl">
+      <table>
+        <tr><th>Slip</th><th>How it's caught</th></tr>
+        <tr><td>Dial typo</td><td>WSJT-X logs the station's kHz, so only a 1 kHz range of dials is possible. Typing 7062.152 instead of 7062.512 is flagged at once.</td></tr>
+        <tr><td>Wrong file</td><td>A run measured on another station, a calibration file in a run slot (or the reverse), or one file used in two slots.</td></tr>
+        <tr><td>Forgot to capture</td><td>Readings that fall in another run's time slot, or a carrier found outside the scheduled key-down.</td></tr>
+        <tr><td>Measure unchecked</td><td>The live <code>fmt.all</code> panel shows whether WSJT-X is writing. An empty file is refused at Capture.</td></tr>
+        <tr><td>WSJT-X calibration left on</td><td>The app reads WSJT-X's settings. A non-zero intercept or slope moves the radio away from the dial WSJT-X shows.</td></tr>
+        <tr><td>Bad calibration station</td><td>Weak (<code>*</code>) readings, AM broadcasters and wild values are left out. A large StdDev points at the odd one out.</td></tr>
+        <tr><td>Radio drifted</td><td>Before and after calibrations that disagree by more than 0.3 Hz trigger a warning; averaging them is the default.</td></tr>
+        <tr><td>Dial moved mid-carrier</td><td>Readings from two dial settings, or (with a FlexRadio) a slice frequency change logged during key-down.</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Getting started</h2>
+    <p class="lead">Sessions (your six files, dial entries and the report) are kept in <code>Documents\FMT Assistant</code>.</p>
+    <div class="grid">
+      <div class="card" style="--c: var(--sky)"><h3><b>1</b>Download</h3><p>Get <code>FMTAssistant.exe</code> and run it; there's no installer. Windows SmartScreen may ask once, because the exe isn't code-signed: choose <b>More info › Run anyway</b>.</p></div>
+      <div class="card" style="--c: var(--on)"><h3><b>2</b>Set up WSJT-X</h3><p>Use <b>Mode › FreqCal</b>, keep only the WWV frequencies you can hear, and set the calibration intercept and slope in Settings to <b>0</b>. Find the <b>Measure</b> box.</p></div>
+      <div class="card" style="--c: var(--amp)"><h3><b>3</b>Point and rehearse</h3><p>In <b>Setup &amp; radio</b>, choose the WSJT-X log folder (it can be on another PC) and press <b>Test</b> for the voice. Then do a run on the <b>Practice</b> tab.</p></div>
+    </div>
+    <p class="lead" style="margin: 24px 0 0">The <a href="https://github.com/va3mw/FMTAssistant#readme">README</a> has the full guide: setup, a rehearsal, every step of test night, each screen, every warning and what to do about it, and troubleshooting.</p>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap split">
+    <div>
+      <h2>Practise on an AM station</h2>
+      <p class="lead" style="margin-bottom: 18px">Your local AM broadcaster is a strong, steady carrier on a round frequency: ideal for rehearsing. Type its frequency, choose how long you need to get ready, and the app counts you into a one-minute measurement with the same prompts as test night.</p>
+      <p class="lead" style="margin-bottom: 0">Broadcasters aren't frequency standards, and are often a hertz or two off nominal. What you're practising is the routine and steady readings. For an exact reference, practise on WWV.</p>
+    </div>
+    <div>
+      <h2>FlexRadio, optional</h2>
+      <p class="lead" style="margin-bottom: 18px">Tick one box and the app finds your FlexRadio on the LAN. <b>Set radio</b> puts the slice in DIGU on the right dial, with RIT off and no DIGU offset, and confirms it with the radio. It can also tune automatically at each call-up.</p>
+      <p class="lead" style="margin-bottom: 0">It reads the dial back for you, and warns if the dial moves during a carrier. It never transmits. Leave it off and everything works the same with any radio.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Tested so far</h2>
+    <p class="lead">New for the November 2026 FMT. Here's where it stands.</p>
+    <div class="tested">
+      <div><b class="ok">Working</b><span>Simulated test nights with a known radio error, recovered within 0.07 Hz; a real WSJT-X 3.0 <code>fmt.all</code> read from a network drive; Set radio on a FLEX-6600M.</span></div>
+      <div><b class="todo">Still to check</b><span>A live FMT, which first happens on November 13, and Set radio while SmartSDR (rather than AetherSDR) is the GUI client.</span></div>
+      <div><b class="no">Not supported</b><span>SmartLink (remote) FlexRadios, and measurement methods other than WSJT-X FreqCal.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="lead">For the curious. The calibration follows WSJT-X's own <code>freqcal</code>, <code>calibrate</code> and <code>fitcal</code> routines, after K1JT's <a href="https://wsjt.sourceforge.io/FMT_User.pdf">Accurate Frequency Measurements with your WSPR Setup</a>.</p>
+    <div class="tbl">
+      <table>
+        <tr><th>Step</th><th>What happens</th></tr>
+        <tr><td>Readings</td><td>Each <code>fmt.all</code> line is <code>UTC kHz CAL Offset fMeas DF Level S/N [*]</code>. The kHz column is (dial + offset) / 1000, rounded down, which is what lets the app check your dial.</td></tr>
+        <tr><td>Calibration</td><td>Readings below the S/N limit (20 dB) and outliers are dropped. Each WWV station's mean DF is a point, and an unweighted least-squares line DF = A + B·f gives A, B, their uncertainties and the StdDev.</td></tr>
+        <tr><td>Carrier</td><td>The longest unbroken stretch of strong readings near the scheduled key-down. Readings outside key-down, the first and last, and anything more than max(0.75 Hz, 5σ) from the median are dropped; you can override any reading.</td></tr>
+        <tr><td>FlexRadio</td><td>UDP 4992 discovery, then the SmartSDR API on TCP 4992: <code>slice set N mode=DIGU</code>, <code>digu_offset=0 rit_on=0</code>, <code>slice tune N f</code>, confirmed by re-subscribing to <code>slice</code> status.</td></tr>
+        <tr><td>Voice</td><td>The Windows speech voice (SAPI), with beeps from the page itself.</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Build from source</h2>
+    <p class="lead">Go with <a href="https://wails.io">Wails</a> for the window. The interface is one plain HTML file, so there's no Node.js build step.</p>
+<pre><span class="c"># tests, including simulated calibrations and runs</span>
+go test ./...
+
+<span class="c"># Windows exe in build\bin</span>
+wails build -ldflags "-s -w"</pre>
+    <div class="chips">
+      <span class="chip" style="--c: var(--sky)">Go</span>
+      <span class="chip" style="--c: var(--violet)">Wails</span>
+      <span class="chip" style="--c: var(--on)">WSJT-X FreqCal</span>
+      <span class="chip" style="--c: var(--orange)">SmartSDR API</span>
+      <span class="chip" style="--c: var(--amp)">MIT</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <img src="icon.png" alt="">Made by Mike VA3MW and Claude · <a href="https://github.com/va3mw/FMTAssistant">github.com/va3mw/FMTAssistant</a><br>
+    MIT licensed · Not affiliated with the ARRL. WSJT-X is by K1JT and the WSJT Development Group. FlexRadio and SmartSDR are trademarks of FlexRadio Systems.<br>
+    <a href="https://fmt.arrl.org/">ARRL Frequency Measuring Test</a> · <a href="https://groups.io/g/fmt-nuts">fmt-nuts group</a> · <a href="http://www.k5cm.com">K5CM</a>
+  </div>
+</footer>
+
+</body>
+</html>

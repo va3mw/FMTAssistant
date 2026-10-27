@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1d5fd1"/>
+      <stop offset="1" stop-color="#0d2a66"/>
+    </linearGradient>
+    <linearGradient id="wave" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#3fb6ff"/>
+      <stop offset="1" stop-color="#3ddc84"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)"/>
+  <!-- spectrum baseline and a single sharp carrier peak -->
+  <path d="M18 92 H50 Q58 92 60 70 L64 26 L68 70 Q70 92 78 92 H110" fill="none" stroke="url(#wave)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- measurement marker -->
+  <line x1="64" y1="18" x2="64" y2="104" stroke="#ffc23d" stroke-width="3" stroke-dasharray="5 5"/>
+  <circle cx="64" cy="26" r="6" fill="#ffc23d"/>
+</svg>
