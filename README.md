@@ -499,7 +499,9 @@ messages are warnings worth a look. **Blue** messages are information.
 
 ## Files and folders
 
-**Session folder:** `Documents\FMT Assistant\<session name>\`
+**Session folder:** `Documents\FMT Assistant\<session name>\`, or
+`C:\Users\<you>\FMT Assistant\<session name>\` if Windows blocks Documents (see
+[Troubleshooting](#troubleshooting)).
 
 | File | Contents |
 |---|---|
@@ -565,6 +567,21 @@ running and connected to the radio, with at least one slice open.
 **Set radio says another program may be changing it.** Something (often a
 logging program or CAT software) put the slice back. Close it or switch off its
 frequency control, and press Set radio again.
+
+**"mkdir …\Documents\FMT Assistant: The system cannot find the file specified", or
+sessions are in `C:\Users\<you>\FMT Assistant` instead of Documents.** Windows
+Security's *Controlled folder access* (ransomware protection) is on, and it blocks
+programs it doesn't know from writing to Documents. Windows reports that block as
+"file not found". FMT Assistant notices this and keeps its sessions in
+`C:\Users\<you>\FMT Assistant` instead; Setup & radio explains why. To use
+Documents, open **Windows Security > Virus & threat protection > Ransomware
+protection > Allow an app through Controlled folder access**, add
+`FMTAssistant.exe`, then restart FMT Assistant. Sessions already in the fallback
+folder can be opened with **Open session…**.
+
+**WSJT-X runs on another PC.** Share that PC's WSJT-X log folder, map it to a
+drive letter (for example `Z:`), and choose it with **Browse…** in Setup. Capture
+works across the network.
 
 **I made a mistake and pressed Capture at the wrong time.** Nothing is lost.
 Earlier `fmt.all` contents are in the WSJT-X folder as `.bak` files. Use
