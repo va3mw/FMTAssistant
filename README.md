@@ -582,4 +582,8 @@ http://localhost:34115.
 - [ARRL Frequency Measuring Test](https://fmt.arrl.org/) · [K5CM](http://www.k5cm.com) ·
   [fmt-nuts group](https://groups.io/g/fmt-nuts)
 
+## License
+
+[MIT](LICENSE) © 2026 Michael VA3MW
+
 73, and good luck on test night. **VA3MW**
