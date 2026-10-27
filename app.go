@@ -32,9 +32,10 @@ type App struct {
 	src   *logx.Source
 	voice *speech.Speaker
 
-	mu    sync.Mutex
-	sess  *session.Session
-	cache map[string]cached
+	mu     sync.Mutex
+	sess   *session.Session
+	notice string // shown in Setup, e.g. why sessions aren't in Documents
+	cache  map[string]cached
 
 	disc  *flex.Discovery
 	radio *flex.Radio
@@ -80,6 +81,20 @@ func (a *App) startup(ctx context.Context) {
 			s = old
 		}
 	}
+	if root, fallback := session.SessionsRoot(); fallback {
+		a.notice = fmt.Sprintf("Windows Security's Controlled folder access stops FMT Assistant writing to Documents, so sessions are kept in %s. "+
+			"To use Documents instead: Windows Security > Virus & threat protection > Ransomware protection > Allow an app through Controlled folder access, add FMTAssistant.exe, then restart FMT Assistant.", root)
+		a.src.Warn("Documents is not writable; sessions go in %s", root)
+	}
+	if !session.Writable(s.Dir()) {
+		nd := session.DefaultDir(filepath.Base(s.Dir()))
+		a.src.Warn("session folder %s is not writable; using %s", s.Dir(), nd)
+		if old, err := session.Load(nd); err == nil {
+			s = old
+		} else {
+			s.SetDir(nd)
+		}
+	}
 	a.sess = s
 	a.saveLocked()
 	a.src.Info("session %q in %s", s.Name, s.Dir())
@@ -110,18 +125,18 @@ func (a *App) saveLocked() {
 // State for the UI
 
 type WSJTXView struct {
-	Dir        string          `json:"dir"`
-	Dirs       []string        `json:"dirs"`
-	DirExists  bool            `json:"dir_exists"`
-	FmtExists  bool            `json:"fmt_exists"`
-	FmtLines   int             `json:"fmt_lines"`
-	FmtAgeSec  float64         `json:"fmt_age_sec"`
-	Last       []fmtdata.Line  `json:"last"`
-	FmtKHz     []int           `json:"fmt_khz"`
-	CalA       float64         `json:"cal_a"`
-	CalB       float64         `json:"cal_b"`
-	IniFound   bool            `json:"ini_found"`
-	Issues     []fmtdata.Issue `json:"issues"`
+	Dir       string          `json:"dir"`
+	Dirs      []string        `json:"dirs"`
+	DirExists bool            `json:"dir_exists"`
+	FmtExists bool            `json:"fmt_exists"`
+	FmtLines  int             `json:"fmt_lines"`
+	FmtAgeSec float64         `json:"fmt_age_sec"`
+	Last      []fmtdata.Line  `json:"last"`
+	FmtKHz    []int           `json:"fmt_khz"`
+	CalA      float64         `json:"cal_a"`
+	CalB      float64         `json:"cal_b"`
+	IniFound  bool            `json:"ini_found"`
+	Issues    []fmtdata.Issue `json:"issues"`
 }
 
 type CalView struct {
@@ -169,6 +184,7 @@ type State struct {
 	Flex     FlexView         `json:"flex"`
 	VoiceOK  bool             `json:"voice_ok"`
 	Problems int              `json:"problems"`
+	Notice   string           `json:"notice"`
 	Version  string           `json:"version"`
 }
 
@@ -177,7 +193,7 @@ func (a *App) GetState() State {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	s := a.sess
-	st := State{Session: s, Dir: s.Dir(), VoiceOK: a.voice.OK(), Version: version}
+	st := State{Session: s, Dir: s.Dir(), VoiceOK: a.voice.OK(), Version: version, Notice: a.notice}
 	st.WSJTX = a.wsjtxView()
 	st.Flex = a.flexView()
 
@@ -764,7 +780,7 @@ func (a *App) StartPractice(freqText string, leadSec int, freshFmt bool) (string
 	}
 	*p = session.Run{ID: "practice", Station: "Practice", NominalKHz: hz / 1000, CarrierHz: hz,
 		KeyDown: time.Now().UTC().Add(time.Duration(leadSec) * time.Second).Truncate(time.Second),
-		MinSNR: p.MinSNR, TrimEdges: p.TrimEdges}
+		MinSNR:  p.MinSNR, TrimEdges: p.TrimEdges}
 	if p.MinSNR == 0 {
 		p.MinSNR, p.TrimEdges = 20, true
 	}
@@ -966,7 +982,7 @@ func (a *App) NewSession(name string) (string, error) {
 // OpenSession opens an existing session folder.
 func (a *App) OpenSession() (string, error) {
 	p, err := wruntime.OpenDirectoryDialog(a.ctx, wruntime.OpenDialogOptions{
-		Title: "Open a session folder", DefaultDirectory: filepath.Join(session.DocumentsDir(), "FMT Assistant"),
+		Title: "Open a session folder", DefaultDirectory: sessionsRoot(),
 	})
 	if err != nil || p == "" {
 		return "", err
@@ -1387,4 +1403,9 @@ func saveLastDir(dir string) {
 	_ = os.MkdirAll(filepath.Dir(p), 0o755)
 	b, _ := json.Marshal(map[string]string{"session_dir": dir})
 	_ = os.WriteFile(p, b, 0o644)
+}
+
+func sessionsRoot() string {
+	r, _ := session.SessionsRoot()
+	return r
 }

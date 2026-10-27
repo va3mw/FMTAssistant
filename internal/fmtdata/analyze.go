@@ -79,21 +79,21 @@ type CalStation struct {
 
 // CalResult is a straight-line fit DF = A + B*f (f in MHz, B in ppm).
 type CalResult struct {
-	Stations  []CalStation `json:"stations"`
-	A         float64      `json:"a"`
-	B         float64      `json:"b"`
-	SigmaA    float64      `json:"sigma_a"`
-	SigmaB    float64      `json:"sigma_b"`
-	RMS       float64      `json:"rms"`
-	NFit      int          `json:"n_fit"`
-	OK        bool         `json:"ok"`
-	First     string       `json:"first"`
-	Last      string       `json:"last"`
-	MidSec    int          `json:"mid_sec"`
-	Total     int          `json:"total"`
-	Used      int          `json:"used"`
-	Issues    []Issue      `json:"issues"`
-	BadLines  int          `json:"bad_lines"`
+	Stations []CalStation `json:"stations"`
+	A        float64      `json:"a"`
+	B        float64      `json:"b"`
+	SigmaA   float64      `json:"sigma_a"`
+	SigmaB   float64      `json:"sigma_b"`
+	RMS      float64      `json:"rms"`
+	NFit     int          `json:"n_fit"`
+	OK       bool         `json:"ok"`
+	First    string       `json:"first"`
+	Last     string       `json:"last"`
+	MidSec   int          `json:"mid_sec"`
+	Total    int          `json:"total"`
+	Used     int          `json:"used"`
+	Issues   []Issue      `json:"issues"`
+	BadLines int          `json:"bad_lines"`
 }
 
 // Correction returns A + B*f, the radio's error in Hz at fMHz.

@@ -379,6 +379,7 @@ function render(){
   if(!f.enabled){ fp.textContent='Flex off'; fp.className='pill' }
   else if(f.snap.connected){ fp.textContent=(f.snap.nickname||f.snap.model||'Flex')+(f.slice?` · ${f.slice.letter} ${fmtKHz(f.slice.freq_hz)} ${f.slice.mode}`:' · no slice'); fp.className='pill ok' }
   else { fp.textContent='Flex not connected'; fp.className='pill bad' }
+  if(S.notice && !window._noticeShown){ window._noticeShown=true; toast('Sessions are not in Documents. See Setup & radio for why.') }
   const pp=document.getElementById('probPill'); pp.textContent=S.problems? S.problems+' problem'+(S.problems>1?'s':''):'No problems'; pp.className='pill '+(S.problems?'bad':'ok');
   badge('bCal', S.cals.reduce((n,c)=>n+errCount(c.issues)+errCount(c.result&&c.result.issues),0));
   badge('bRuns', S.runs.reduce((n,r)=>n+errCount(r.result&&r.result.issues),0));
@@ -671,6 +672,7 @@ function renderSetup(){
     <div class="kv"><b>Name</b><span>${esc(s.name)}</span><b>Folder</b><span class="mono" style="word-break:break-all">${esc(S.dir)}</span>
     <b>Callsign</b><span><input value="${esc(s.callsign)}" style="width:120px" onchange="call('SetCallsign',this.value)"></span></div>
     <div class="row" style="margin-top:10px"><button onclick="newSession()">New session…</button><button onclick="openSession()">Open session…</button><button onclick="api().OpenSessionFolder()">Open folder</button></div>
+    ${S.notice?issuesHTML([{level:'warn',msg:S.notice}]):''}
     <div class="hint" style="margin-top:6px">Each session keeps its six files (before calibration, four runs, after calibration), your dial entries and the report.</div></div>
   <div class="card"><h2>WSJT-X log folder</h2>
     <div class="hint">Where WSJT-X writes fmt.all (File &gt; Open log directory).</div>

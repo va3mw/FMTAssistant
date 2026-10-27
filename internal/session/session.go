@@ -223,7 +223,36 @@ func DocumentsDir() string {
 
 // DefaultDir is Documents\FMT Assistant\<name>.
 func DefaultDir(name string) string {
-	return filepath.Join(DocumentsDir(), "FMT Assistant", SafeName(name))
+	root, _ := SessionsRoot()
+	return filepath.Join(root, SafeName(name))
+}
+
+// SessionsRoot is where sessions are kept: Documents\FMT Assistant, or
+// %USERPROFILE%\FMT Assistant (fallback true) when Documents can't be written.
+// Windows Security's "Controlled folder access" blocks unknown programs from
+// writing to Documents, and reports it as "file not found".
+func SessionsRoot() (root string, fallback bool) {
+	docs := filepath.Join(DocumentsDir(), "FMT Assistant")
+	if Writable(docs) {
+		return docs, false
+	}
+	h, _ := os.UserHomeDir()
+	return filepath.Join(h, "FMT Assistant"), true
+}
+
+// Writable creates dir if needed and checks a file can be written in it.
+func Writable(dir string) bool {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return false
+	}
+	f, err := os.CreateTemp(dir, ".write-test-*")
+	if err != nil {
+		return false
+	}
+	name := f.Name()
+	f.Close()
+	os.Remove(name)
+	return true
 }
 
 // SafeName strips characters Windows does not allow in folder names.

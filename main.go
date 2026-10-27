@@ -16,7 +16,7 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-const version = "0.2.0"
+const version = "0.2.1"
 
 func main() {
 	cfg, _ := os.UserConfigDir()
@@ -37,12 +37,12 @@ func main() {
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 245, G: 246, B: 248, A: 1},
-		OnStartup:        app.startup,
-		OnShutdown:       app.shutdown,
-		Bind:             []interface{}{app},
+		BackgroundColour:   &options.RGBA{R: 245, G: 246, B: 248, A: 1},
+		OnStartup:          app.startup,
+		OnShutdown:         app.shutdown,
+		Bind:               []interface{}{app},
 		SingleInstanceLock: lock,
-		Windows: &windows.Options{},
+		Windows:            &windows.Options{},
 	})
 	if err != nil {
 		l.Log(logx.Error, "app", "wails: %v", err)
