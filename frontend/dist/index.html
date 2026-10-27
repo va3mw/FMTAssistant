@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FMT Assistant</title>
+<style>
+:root{
+  --bg:#f4f5f7; --panel:#fff; --ink:#1d2330; --muted:#5f6b7a; --line:#dde1e7;
+  --accent:#1f6feb; --accent-ink:#fff; --ok:#1a7f37; --ok-bg:#e6f4ea; --warn:#9a6700; --warn-bg:#fff4d6;
+  --err:#c62828; --err-bg:#fde7e7; --info:#3b5b8a; --info-bg:#eaf1fb; --hl:#fffbe6; --now:#e8f0fe;
+  --mono: "Cascadia Mono", Consolas, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:14px/1.4 "Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column}
+button{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:6px;padding:5px 11px;cursor:pointer}
+button:hover{border-color:#b9c1cc;background:#f8f9fb}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.primary:hover{filter:brightness(1.07)}
+button.small{padding:2px 8px;font-size:12px}
+button:disabled{opacity:.45;cursor:default}
+input,select{font:inherit;border:1px solid #c5ccd6;border-radius:6px;padding:4px 7px;background:#fff;color:var(--ink)}
+input.num{font-family:var(--mono)}
+input:focus,select:focus{outline:2px solid #b6d0fb;border-color:var(--accent)}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.grow{flex:1}
+
+/* header */
+header{background:#141a24;color:#e8edf5;padding:10px 18px;display:flex;gap:26px;align-items:center}
+header .brand{font-weight:600;font-size:15px;line-height:1.2}
+header .brand small{display:block;color:#93a1b5;font-weight:400}
+.clock{font-family:var(--mono);font-size:34px;font-weight:600;letter-spacing:1px;line-height:1}
+.clock small{font-size:14px;color:#93a1b5;margin-left:4px}
+.clocksub{font-size:12px;color:#93a1b5;margin-top:3px}
+.next{border-left:1px solid #2c3646;padding-left:22px}
+.next .lbl{font-size:12px;color:#93a1b5}
+.next .what{font-size:15px;font-weight:600}
+.next .cd{font-family:var(--mono);font-size:26px;font-weight:600;color:#ffd166}
+.timer{border-left:1px solid #2c3646;padding-left:22px}
+.timer .cd{font-family:var(--mono);font-size:22px}
+.timer button{background:#232c3a;border-color:#38445a;color:#e8edf5;padding:2px 8px;font-size:12px}
+.hdr-right{margin-left:auto;display:flex;gap:10px;align-items:center}
+.pill{border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;background:#232c3a;color:#cfd8e6;border:1px solid #38445a;cursor:pointer}
+.pill.ok{background:#16351f;color:#8fe0a5;border-color:#235c33}
+.pill.bad{background:#4a1a1a;color:#ffb3b3;border-color:#7a2a2a}
+
+/* now banner */
+#banner{padding:10px 18px;background:var(--now);border-bottom:1px solid #c9d8f5;display:flex;gap:14px;align-items:center}
+#banner .big{font-size:17px;font-weight:600}
+#banner.live{background:#fff1d6;border-color:#f0cf87}
+#banner.carrier{background:#ffe1e1;border-color:#f2a3a3}
+
+nav{display:flex;gap:2px;padding:0 18px;background:#fff;border-bottom:1px solid var(--line)}
+nav button{border:none;border-bottom:3px solid transparent;border-radius:0;padding:10px 14px;background:none;color:var(--muted);font-weight:600}
+nav button.on{color:var(--ink);border-bottom-color:var(--accent)}
+nav .badge{background:var(--err);color:#fff;border-radius:999px;font-size:11px;padding:0 6px;margin-left:5px}
+main{flex:1;overflow:auto;padding:16px 18px 40px}
+.tab{display:none}.tab.on{display:block}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.card h2{margin:0 0 4px;font-size:16px}
+.card h3{margin:14px 0 6px;font-size:14px}
+.card.current{border-color:var(--accent);box-shadow:0 0 0 2px #cfe0fd}
+.card.done{border-left:5px solid var(--ok)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.grid2>*,.layout>*{min-width:0}
+select{max-width:100%}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;align-items:start}
+@media (max-width:1150px){.layout{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
+
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13px}
+.kv b{font-weight:600;color:var(--muted)}
+.bigdial{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent)}
+.answer{font-family:var(--mono);font-size:20px;font-weight:700}
+.answer.ok{color:var(--ok)}
+.status{font-size:12px;font-weight:600;border-radius:5px;padding:2px 7px}
+.status.ok{background:var(--ok-bg);color:var(--ok)}
+.status.wait{background:#eef0f3;color:var(--muted)}
+.status.bad{background:var(--err-bg);color:var(--err)}
+.status.warn{background:var(--warn-bg);color:var(--warn)}
+
+.issues{margin:8px 0 0;padding:0;list-style:none}
+.issues li{padding:5px 9px;border-radius:6px;margin-top:4px;font-size:13px}
+.issues li.error{background:var(--err-bg);color:var(--err)}
+.issues li.warn{background:var(--warn-bg);color:var(--warn)}
+.issues li.info{background:var(--info-bg);color:var(--info)}
+
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--line);padding:4px 6px;white-space:nowrap}
+td{border-bottom:1px solid #eef0f3;padding:3px 6px;white-space:nowrap}
+td.n,th.n{text-align:right;font-family:var(--mono)}
+tr.used td{background:var(--ok-bg)}
+tr.weak td{color:#9aa4b2}
+tr.forced td:first-child{box-shadow:inset 3px 0 var(--accent)}
+.scroll{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.seg button{border-radius:0;padding:1px 7px;font-size:11px}
+.seg button:first-child{border-radius:5px 0 0 5px}.seg button:last-child{border-radius:0 5px 5px 0}
+.seg button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+.steps{margin:6px 0 0 0;padding-left:20px}
+.steps li{margin:3px 0}
+.live td{font-family:var(--mono);font-size:12px}
+.toast{position:fixed;right:18px;bottom:18px;max-width:460px;background:#141a24;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 6px 24px #0004;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+.toast.err{background:#8c1d1d}
+.hint{font-size:12px;color:var(--muted)}
+.chart{width:100%;height:150px;background:#fbfcfd;border:1px solid var(--line);border-radius:8px}
+label.chk{display:inline-flex;gap:6px;align-items:center}
+pre.report{background:#0f141c;color:#d7e0ec;padding:12px;border-radius:8px;font-size:12px;overflow:auto;max-height:520px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">FMT Assistant<small id="ver"></small></div>
+  <div>
+    <div class="clock" id="utc">--:--:--<small>UTC</small></div>
+    <div class="clocksub" id="utcsub"></div>
+  </div>
+  <div class="next">
+    <div class="lbl">Next</div>
+    <div class="what" id="nextWhat">-</div>
+    <div class="cd" id="nextCd">--:--</div>
+  </div>
+  <div class="timer">
+    <div class="lbl" style="font-size:12px;color:#93a1b5">Timer</div>
+    <div class="cd" id="timerCd">0:00</div>
+    <div class="row" style="gap:4px;margin-top:3px">
+      <button onclick="timerStart(60)">1 min</button><button onclick="timerStart(300)">5 min</button>
+      <button onclick="timerStart(prompt('Seconds?','30')*1)">…</button><button onclick="timerStop()">Stop</button>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <span class="pill" id="voicePill" onclick="toggleVoice()">Voice</span>
+    <span class="pill" id="flexPill" onclick="showTab('setup')">Flex off</span>
+    <span class="pill" id="probPill" onclick="showTab('results')">-</span>
+  </div>
+</header>
+<div id="banner"><div class="grow"><div class="big" id="bannerBig">Loading…</div><div id="bannerSub" class="muted"></div></div><div id="bannerBtns" class="row"></div></div>
+<nav>
+  <button data-tab="night" class="on" onclick="showTab('night')">Test night</button>
+  <button data-tab="cal" onclick="showTab('cal')">Calibration<span class="badge" id="bCal" hidden></span></button>
+  <button data-tab="runs" onclick="showTab('runs')">Run analysis<span class="badge" id="bRuns" hidden></span></button>
+  <button data-tab="results" onclick="showTab('results')">Results</button>
+  <button data-tab="setup" onclick="showTab('setup')">Setup &amp; radio<span class="badge" id="bSetup" hidden></span></button>
+</nav>
+<main>
+  <section class="tab on" id="tab-night"><div class="layout"><div id="timeline"></div><div id="side"></div></div></section>
+  <section class="tab" id="tab-cal"><div id="calPanel"></div></section>
+  <section class="tab" id="tab-runs"><div id="runsPanel"></div></section>
+  <section class="tab" id="tab-results"><div id="resultsPanel"></div></section>
+  <section class="tab" id="tab-setup"><div id="setupPanel"></div></section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const api = () => window.go.main.App;
+let S = null;              // last state from Go
+let lastJSON = {};          // per-panel render cache
+let selRun = null;          // run shown in the analysis tab
+const fired = new Set(JSON.parse(safeGet('fired') || '[]'));
+
+function safeGet(k){ try{ return localStorage.getItem(k) }catch(e){ return null } }
+function safeSet(k,v){ try{ localStorage.setItem(k,v) }catch(e){} }
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
+function commas(n){ return Math.trunc(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') }
+function fmtKHz(hz){ if(!hz) return '-'; const k=Math.round(hz)/1000; const w=Math.floor(k); return commas(w)+'.'+String(Math.round((k-w)*1000)).padStart(3,'0')+' kHz' }
+function fmtHz(hz){ if(hz==null) return '-'; let w=Math.floor(hz), c=Math.round((hz-w)*100); if(c===100){w++;c=0} return commas(w)+'.'+String(c).padStart(2,'0')+' Hz' }
+function hhmm(t){ const d=new Date(t); return d.toISOString().substr(11,5) }
+function local(t){ return new Date(t).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) }
+function dur(sec){ sec=Math.max(0,Math.round(sec)); if(sec>=86400) return Math.floor(sec/86400)+'d '+dur(sec%86400); const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s=sec%60; return (h? h+':'+String(m).padStart(2,'0') : m)+':'+String(s).padStart(2,'0') }
+function toast(msg, err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast on'+(err?' err':''); clearTimeout(t._h); t._h=setTimeout(()=>t.className='toast', err?7000:3500) }
+async function call(fn, ...args){ try{ const r = await api()[fn](...args); refresh(); return r }catch(e){ toast(String(e), true); refresh(); throw e } }
+function issuesHTML(list){ if(!list||!list.length) return ''; return '<ul class="issues">'+list.map(i=>`<li class="${i.level}">${esc(i.msg)}</li>`).join('')+'</ul>' }
+function errCount(list){ return (list||[]).filter(i=>i.level==='error').length }
+
+function showTab(t){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
+  document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on', s.id==='tab-'+t));
+  safeSet('tab', t);
+}
+
+// Replace a panel's HTML unless the user is typing in it.
+function put(id, html){
+  const el=document.getElementById(id);
+  if(el.contains(document.activeElement) && document.activeElement.matches('input,select')) return;
+  if(lastJSON[id]===html) return;
+  lastJSON[id]=html; el.innerHTML=html;
+}
+
+// ------------------------------------------------------------------ audio
+let actx=null;
+function beep(freq=880, ms=150, vol=0.25){
+  if(S && !S.session.beeps) return;
+  try{
+    actx = actx || new AudioContext();
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.frequency.value=freq; o.type='sine'; g.gain.value=vol;
+    o.connect(g); g.connect(actx.destination);
+    const t=actx.currentTime; g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+ms/1000);
+    o.start(t); o.stop(t+ms/1000+0.02);
+  }catch(e){}
+}
+function say(text){
+  if(!S || !S.session.voice) return;
+  if(S.voice_ok) api().Speak(text);
+  else if(window.speechSynthesis){ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.volume=(S.session.volume||100)/100; speechSynthesis.speak(u) }
+}
+function spokenKHz(hz){ return (Math.round(hz)/1000).toFixed(3).replace(/0+$/,'').replace(/\.$/,'') + ' kilohertz' }
+
+// ------------------------------------------------------------------ timer
+let timerEnd=0;
+function timerStart(sec){ if(!(sec>0)) return; timerEnd=Date.now()+sec*1000; beep(660,80) }
+function timerStop(){ timerEnd=0; document.getElementById('timerCd').textContent='0:00' }
+
+// ------------------------------------------------------------------ schedule
+// Events the scheduler announces. Each has an absolute time and an action.
+function events(){
+  if(!S) return [];
+  const runs=S.runs, ev=[];
+  if(!runs.length) return ev;
+  const first=new Date(runs[0].call_up).getTime();
+  const lastUp=new Date(runs[runs.length-1].key_up).getTime();
+  ev.push({id:'calb-start', t:first-20*60e3, label:'Start WWV calibration', slot:'cal_before',
+    say:'Twenty minutes to the first run. Start the before calibration. In WSJT-X choose mode FreqCal, check Measure, and run Tools, Execute frequency calibration cycle.'});
+  ev.push({id:'calb-stop', t:first-4*60e3, label:'Stop calibration and capture it', slot:'cal_before',
+    say:'Four minutes to the first call-up. Stop the calibration cycle, then press Capture for the before calibration.', beep:true});
+  runs.forEach(rv=>{
+    const r=rv.run, kd=new Date(r.key_down).getTime(), dial=rv.suggest_dial_hz;
+    ev.push({id:r.id+'-callup', t:kd-5*60e3, run:rv, label:rv.title+' call-up', tune:true,
+      say:`${speakTitle(rv)} call-up is starting. Turn the calibration cycle off and leave Measure on. Set U S B dial to ${spokenKHz(dial)}.`, beep:true});
+    ev.push({id:r.id+'-2min', t:kd-2*60e3, run:rv, label:'Centre the tone',
+      say:'Two minutes to key-down. Centre the tone near fifteen hundred hertz, then write down the exact dial.'});
+    ev.push({id:r.id+'-30s', t:kd-30e3, run:rv, label:'Hands off the dial', say:'Thirty seconds. Do not touch the dial.'});
+    for(let i=5;i>=1;i--) ev.push({id:r.id+'-pip'+i, t:kd-i*1e3, run:rv, quiet:true, pip:true});
+    ev.push({id:r.id+'-kd', t:kd, run:rv, label:rv.title+' key-down', say:'Key down. Measuring.', longbeep:true, note:true});
+    ev.push({id:r.id+'-30left', t:kd+30e3, run:rv, label:'30 s left', say:'Thirty seconds left.'});
+    ev.push({id:r.id+'-ku', t:kd+60e3, run:rv, label:rv.title+' carrier ends', slot:r.id,
+      say:`Carrier ended. Press Capture for ${speakTitle(rv)}, and enter the dial you used.`, longbeep:true});
+  });
+  ev.push({id:'cala-start', t:lastUp+60e3, label:'Start after calibration', slot:'cal_after',
+    say:'All runs are done. Start the after calibration on W W V, let it run several cycles, then capture it.', beep:true});
+  return ev.sort((a,b)=>a.t-b.t);
+}
+function speakTitle(rv){ return rv.run.station.split('').join(' ')+' '+rv.run.band.replace(' m',' meters') }
+
+function fire(e){
+  if(fired.has(e.id+'@'+e.t)) return;
+  fired.add(e.id+'@'+e.t); safeSet('fired', JSON.stringify([...fired].slice(-200)));
+  if(e.pip){ beep(1000,90); return }
+  if(e.longbeep) beep(1320,600,0.3); else if(e.beep) beep(880,200);
+  if(e.say) setTimeout(()=>say(e.say), e.longbeep?650:(e.beep?250:0));
+  if(e.tune && S.session.flex.enabled && S.session.flex.auto_tune && e.run){
+    api().FlexTune(e.run.suggest_dial_hz).then(m=>toast(m)).catch(err=>toast('Auto-tune: '+err, true));
+  }
+  if(e.note && e.run) api().NoteRadioDial(e.run.run.id);
+}
+
+// Phase of the test right now, for the banner.
+function phase(now){
+  if(!S) return null;
+  for(const rv of S.runs){
+    const cu=new Date(rv.call_up).getTime(), kd=new Date(rv.run.key_down).getTime(), ku=kd+60e3;
+    if(now>=kd && now<ku) return {kind:'carrier', rv, left:(ku-now)/1000};
+    if(now>=cu && now<kd) return {kind:'callup', rv, left:(kd-now)/1000};
+    if(now>=ku && now<ku+4*60e3 && !rv.present) return {kind:'capture', rv};
+  }
+  return null;
+}
+
+function tick(){
+  const now=Date.now(), d=new Date(now);
+  document.getElementById('utc').innerHTML=d.toISOString().substr(11,8)+'<small>UTC</small>';
+  document.getElementById('utcsub').textContent=d.toISOString().substr(0,10)+' · local '+d.toLocaleTimeString();
+  if(timerEnd){
+    const left=(timerEnd-now)/1000;
+    document.getElementById('timerCd').textContent=dur(Math.ceil(left));
+    if(left<=0){ timerEnd=0; beep(1320,500); setTimeout(()=>beep(1320,500),650); say('Timer done.') }
+    else if(left<=5 && Math.abs(left-Math.round(left))<0.13) beep(1000,60);
+  }
+  if(!S) return;
+  const ev=events();
+  for(const e of ev) if(now>=e.t && now<e.t+20e3) fire(e);
+  const nx=ev.find(e=>!e.quiet && e.t>now);
+  document.getElementById('nextWhat').textContent = nx ? nx.label : 'Nothing scheduled';
+  document.getElementById('nextCd').textContent = nx ? dur((nx.t-now)/1000) : '--:--';
+  banner(now, nx);
+}
+
+function banner(now, nx){
+  const b=document.getElementById('banner'), big=document.getElementById('bannerBig'), sub=document.getElementById('bannerSub'), btn=document.getElementById('bannerBtns');
+  const p=phase(now); let cls='', html='', s='', buttons='';
+  if(p && p.kind==='carrier'){
+    cls='carrier'; html=`KEY-DOWN: ${esc(p.rv.title)} · ${dur(p.left)} left`;
+    s='Hands off the dial. WSJT-X is measuring (Measure must be checked).';
+  }else if(p && p.kind==='callup'){
+    cls='live'; html=`${esc(p.rv.title)} call-up · key-down in ${dur(p.left)}`;
+    s=`Mode FreqCal, calibration cycle OFF, Measure ON. Set USB/DIGU dial to <b class="mono">${fmtKHz(p.rv.suggest_dial_hz)}</b> (carrier ${fmtKHz(p.rv.run.carrier_hz)} − 1500 Hz).`;
+    if(S.session.flex.enabled) buttons+=`<button class="primary" onclick="tuneRun('${p.rv.run.id}')">Set radio: DIGU ${fmtKHz(p.rv.suggest_dial_hz)}</button>`;
+  }else if(p && p.kind==='capture'){
+    cls='live'; html=`${esc(p.rv.title)} carrier ended - capture the file`;
+    s='Capture copies fmt.all for this run and clears it for the next one.';
+    buttons+=`<button class="primary" onclick="capture('${p.rv.run.id}')">Capture ${esc(p.rv.title)}</button>`;
+  }else if(nx){
+    html=`Next: ${esc(nx.label)} at ${hhmm(nx.t)} UTC (${local(nx.t)} local)`;
+    s = nx.slot && nx.slot.startsWith('cal') ? 'Calibration: mode FreqCal, Measure ON, Tools > Execute frequency calibration cycle on WWV.' : 'Clock runs from this PC; make sure Windows time is synchronised.';
+    if(nx.slot==='cal_before' || nx.slot==='cal_after') buttons+=`<button onclick="capture('${nx.slot}')">Capture ${nx.slot==='cal_before'?'before':'after'} calibration</button>`;
+  }else{
+    html='All scheduled events are past.'; s='Check the Results tab, then submit at fmt.arrl.org.';
+  }
+  b.className=cls; big.innerHTML=html; sub.innerHTML=s;
+  if(btn.dataset.h!==buttons){ btn.innerHTML=buttons; btn.dataset.h=buttons }
+}
+
+// ------------------------------------------------------------------ actions
+async function capture(id){
+  try{ toast(await api().CaptureSlot(id,false)); }
+  catch(e){
+    if(String(e).includes('REPLACE')){
+      if(confirm('This slot already has a file. Replace it with the current fmt.all? (The old file is kept in the session folder.)')){
+        try{ toast(await api().CaptureSlot(id,true)) }catch(e2){ toast(String(e2),true) }
+      }
+    } else toast(String(e), true);
+  }
+  refresh();
+}
+async function loadSlot(id){ try{ const m=await api().LoadSlot(id); if(m) toast(m) }catch(e){ toast(String(e),true) } refresh() }
+async function clearSlot(id){ if(confirm('Remove this file from the session? (It stays in the session folder, renamed.)')) call('ClearSlot', id) }
+async function tuneRun(id){
+  const rv=S.runs.find(r=>r.run.id===id);
+  try{ toast(await api().FlexTune(rv.suggest_dial_hz)) }catch(e){ toast(String(e),true) }
+}
+async function tuneTo(hz){ try{ toast(await api().FlexTune(hz)) }catch(e){ toast(String(e),true) } }
+async function setDial(id, el){
+  try{ const r=await api().SetDial(id, el.value); el.nextElementSibling.textContent=r||'' }
+  catch(e){ el.nextElementSibling.textContent=String(e) }
+  refresh();
+}
+async function useRadioDial(id){ try{ toast(await api().UseRadioDial(id)) }catch(e){ toast(String(e),true) } refresh() }
+async function setCarrier(id, el){ await call('SetCarrier', id, el.value) }
+async function retone(id){
+  const rv=S.runs.find(r=>r.run.id===id);
+  const tone=parseFloat(prompt('Audio frequency of the carrier on the WSJT-X waterfall now (Hz)?', '1500'));
+  if(!(tone>0)) return;
+  const sl=S.flex.slice;
+  const dial = (S.session.flex.enabled && sl) ? sl.freq_hz : (rv.run.dial_hz || rv.suggest_dial_hz);
+  const carrier = dial + tone;
+  await call('SetCarrier', id, (carrier/1000).toFixed(3));
+  toast(`Carrier estimate ${fmtKHz(carrier)}; set dial ${fmtKHz(Math.round(carrier-1500))}.`);
+}
+function toggleVoice(){ call('SetVoice', !S.session.voice, S.session.volume||100, S.session.beeps) }
+
+// ------------------------------------------------------------------ render
+function render(){
+  if(!S) return;
+  document.getElementById('ver').textContent='v'+S.version+' · '+S.session.name;
+  const vp=document.getElementById('voicePill'); vp.textContent=S.session.voice?'Voice on':'Voice off'; vp.className='pill'+(S.session.voice?' ok':'');
+  const fp=document.getElementById('flexPill'), f=S.flex;
+  if(!f.enabled){ fp.textContent='Flex off'; fp.className='pill' }
+  else if(f.snap.connected){ fp.textContent=(f.snap.nickname||f.snap.model||'Flex')+(f.slice?` · ${f.slice.letter} ${fmtKHz(f.slice.freq_hz)} ${f.slice.mode}`:' · no slice'); fp.className='pill ok' }
+  else { fp.textContent='Flex not connected'; fp.className='pill bad' }
+  const pp=document.getElementById('probPill'); pp.textContent=S.problems? S.problems+' problem'+(S.problems>1?'s':''):'No problems'; pp.className='pill '+(S.problems?'bad':'ok');
+  badge('bCal', S.cals.reduce((n,c)=>n+errCount(c.issues)+errCount(c.result&&c.result.issues),0));
+  badge('bRuns', S.runs.reduce((n,r)=>n+errCount(r.result&&r.result.issues),0));
+  badge('bSetup', errCount(S.wsjtx.issues)+errCount(f.issues));
+  renderTimeline(); renderSide(); renderCal(); renderRuns(); renderResults(); renderSetup();
+}
+function badge(id,n){ const b=document.getElementById(id); b.hidden=!n; b.textContent=n }
+
+function slotButtons(id, present){
+  return `<button class="primary" onclick="capture('${id}')">Capture fmt.all</button>
+    <button onclick="loadSlot('${id}')">Load file…</button>
+    ${present?`<button onclick="clearSlot('${id}')">Remove</button>`:''}`;
+}
+function statusChip(ok, present, issues){
+  if(!present) return '<span class="status wait">No file</span>';
+  if(errCount(issues)) return '<span class="status bad">Needs attention</span>';
+  if(ok) return '<span class="status ok">Ready</span>';
+  return '<span class="status warn">Check</span>';
+}
+
+function calCard(c, when){
+  const r=c.result, issues=[...(c.issues||[]), ...((r&&r.issues)||[])];
+  return `<div class="card ${r&&r.ok&&!errCount(issues)?'done':''}">
+    <div class="row"><h2 class="grow">${esc(c.title)}</h2>${statusChip(r&&r.ok, c.present, issues)}</div>
+    <div class="hint">${when}</div>
+    ${r&&r.ok? `<div class="kv" style="margin-top:8px"><b>Slope</b><span class="mono">${r.b.toFixed(4)} ± ${r.sigma_b.toFixed(4)} ppm</span>
+      <b>Intercept</b><span class="mono">${r.a.toFixed(3)} ± ${r.sigma_a.toFixed(3)} Hz</span>
+      <b>Stations / StdDev</b><span class="mono">${r.n_fit} / ${r.rms.toFixed(3)} Hz</span>
+      <b>Readings</b><span>${r.used} used of ${r.total} (${r.first}-${r.last} UTC)</span></div>`:''}
+    <div class="row" style="margin-top:10px">${slotButtons(c.id, c.present)}<button onclick="showTab('cal')">Details</button></div>
+    ${issuesHTML(issues)}
+  </div>`;
+}
+
+function runCard(rv, idx){
+  const r=rv.run, res=rv.result, now=Date.now();
+  const cu=new Date(rv.call_up).getTime(), ku=new Date(rv.key_up).getTime();
+  const current = now>=cu-60e3 && now<ku+4*60e3;
+  const allIssues=[...(rv.issues||[]), ...((res&&res.issues)||[])];
+  const flexOn=S.session.flex.enabled;
+  return `<div class="card ${current?'current':''} ${rv.ready?'done':''}">
+    <div class="row"><h2 class="grow">Run ${idx+1}: ${esc(rv.title)} <span class="muted" style="font-weight:400">near ${r.nominal_khz} kHz</span></h2>${statusChip(rv.ready, rv.present, allIssues)}</div>
+    <div class="hint">Call-up ${hhmm(rv.call_up)}Z · key-down <b>${hhmm(r.key_down)}-${hhmm(rv.key_up)} UTC</b> (${local(r.key_down)} local)</div>
+    <div class="grid2" style="margin-top:10px">
+      <div>
+        <div class="kv">
+          <b>Carrier (estimate)</b><span><input class="num" style="width:120px" value="${(r.carrier_hz/1000).toFixed(3)}" onchange="setCarrier('${r.id}',this)"> kHz
+            <button class="small" onclick="retone('${r.id}')" title="Enter the tone you see on the waterfall to update the estimate">Tone is at…</button></span>
+          <b>Set dial to</b><span class="bigdial">${fmtKHz(rv.suggest_dial_hz)}</span>
+          <b>Mode</b><span>USB${flexOn?' (DIGU on the Flex)':''}, WSJT-X FreqCal, Rx ${'1500'} Hz</span>
+        </div>
+        ${flexOn?`<div class="row" style="margin-top:8px"><button class="primary" onclick="tuneRun('${r.id}')">Set radio: DIGU ${fmtKHz(rv.suggest_dial_hz)}</button></div>`:''}
+      </div>
+      <div>
+        <div class="kv">
+          <b>Dial you used</b><span><input class="num" style="width:150px" placeholder="e.g. 7062.500" value="${esc(r.dial_text)}" onchange="setDial('${r.id}',this)"> <span class="hint">${r.dial_hz?('= '+fmtHz(r.dial_hz)):'kHz'}</span>
+            ${flexOn?`<button class="small" onclick="useRadioDial('${r.id}')">From radio</button>`:''}</span>
+          <b>Mean fMeas</b><span class="mono">${res&&res.n? res.mean_fmeas.toFixed(3)+' Hz (n='+res.n+', sd '+res.sd.toFixed(2)+')':'-'}</span>
+          <b>Correction</b><span class="mono">${rv.corr_hz!=null? (rv.corr_hz>=0?'+':'')+rv.corr_hz.toFixed(3)+' Hz':'-'}</span>
+          <b>Carrier</b><span class="answer ${rv.ready?'ok':''}">${rv.final_hz!=null? fmtHz(rv.final_hz):'-'}</span>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">${slotButtons(r.id, rv.present)}${rv.present?`<button onclick="selRun='${r.id}';showTab('runs')">Readings</button>`:''}</div>
+    ${issuesHTML(allIssues)}
+  </div>`;
+}
+
+function renderTimeline(){
+  if(!S.runs.length) return;
+  const first=S.runs[0].call_up, last=S.runs[S.runs.length-1].key_up;
+  const b=new Date(new Date(first).getTime()-20*60e3), a=new Date(new Date(last).getTime()+60e3);
+  let h=calCard(S.cals[0], `About 20 minutes before the first run (≈${hhmm(b)}Z). WWV, mode FreqCal, Measure on, Tools > Execute frequency calibration cycle, several cycles.`);
+  S.runs.forEach((rv,i)=>h+=runCard(rv,i));
+  h+=calCard(S.cals[1], `After the last run (≈${hhmm(a)}Z). Same procedure; comparing before and after shows drift.`);
+  put('timeline', h);
+}
+
+function renderSide(){
+  const w=S.wsjtx;
+  const fresh = w.fmt_exists && w.fmt_age_sec < 30;
+  let h=`<div class="card"><h2>WSJT-X fmt.all (live)</h2>
+    <div class="hint mono" style="word-break:break-all">${esc(w.dir)}</div>
+    <div style="margin:6px 0">${!w.dir_exists?'<span class="status bad">Folder missing</span>': !w.fmt_exists?'<span class="status wait">No fmt.all yet</span>': fresh?'<span class="status ok">Measuring · '+w.fmt_lines+' readings</span>':'<span class="status warn">Idle '+dur(w.fmt_age_sec)+' · '+w.fmt_lines+' readings</span>'}</div>
+    ${w.fmt_khz&&w.fmt_khz.length?`<div class="hint">Frequencies in file: ${w.fmt_khz.map(k=>k+' kHz').join(', ')}</div>`:''}
+    ${w.last&&w.last.length?`<table class="live" style="margin-top:6px"><tr><th>UTC</th><th class="n">kHz</th><th class="n">fMeas</th><th class="n">S/N</th></tr>
+      ${w.last.slice().reverse().map(l=>`<tr class="${l.flag||l.snr<20?'weak':''}"><td>${l.time}</td><td class="n">${l.khz}</td><td class="n">${l.fmeas.toFixed(3)}</td><td class="n">${l.snr.toFixed(1)}${l.flag?'*':''}</td></tr>`).join('')}</table>`:''}
+    <div class="row" style="margin-top:8px"><button onclick="clearFmt()">Start a fresh fmt.all</button></div>
+    ${issuesHTML(w.issues)}
+  </div>`;
+  h+=`<div class="card"><h2>Before each step</h2><ol class="steps">
+    <li>WSJT-X <b>Mode &gt; FreqCal</b>.</li>
+    <li><b>Measure</b> box checked (the step most people miss).</li>
+    <li>Calibration: <b>Tools &gt; Execute frequency calibration cycle</b> on.</li>
+    <li>Test runs: calibration cycle <b>off</b>, dial set by hand, then hands off.</li>
+    <li>Do <b>not</b> click Apply in Solve for calibration; this app applies it.</li>
+    <li>Press <b>Capture</b> after each step so every run gets its own file.</li></ol></div>`;
+  put('side', h);
+}
+async function clearFmt(){ if(confirm('Rename the current fmt.all so WSJT-X starts a new one? Nothing is deleted.')){ try{ toast(await api().ClearFmtAll()) }catch(e){ toast(String(e),true) } refresh() } }
+
+function renderCal(){
+  const mode=S.session.cal_mode;
+  let h=`<div class="card"><h2>Which calibration to apply</h2><div class="row">
+    ${[['average','Average of before and after (recommended)'],['before','Before only'],['after','After only'],['none','No correction (GPS-locked radio)']].map(([v,l])=>
+      `<label class="chk"><input type="radio" name="calmode" ${mode===v?'checked':''} onchange="call('SetCalMode','${v}')"> ${l}</label>`).join('')}
+    </div><div class="hint" style="margin-top:6px">Correction at frequency f (MHz) is A + B×f. Carrier = dial + mean fMeas − correction.</div></div>`;
+  for(const c of S.cals){
+    const r=c.result;
+    h+=`<div class="card"><div class="row"><h2 class="grow">${esc(c.title)}</h2>
+      <span class="hint">Ignore readings below</span><input class="num" style="width:60px" type="number" value="${c.cal.min_snr}" onchange="call('SetCalSNR','${c.id}',+this.value)"> dB S/N
+      ${slotButtons(c.id, c.present)}</div>
+      ${c.cal.slot.file?`<div class="hint">File: ${esc(c.cal.slot.file)} · from ${esc(c.cal.slot.source)}</div>`:''}
+      ${issuesHTML(c.issues)}`;
+    if(r){
+      if(r.ok) h+=`<div class="row" style="gap:28px;margin:10px 0"><div><div class="hint">Slope B</div><div class="answer">${r.b.toFixed(4)} <span class="hint">± ${r.sigma_b.toFixed(4)} ppm</span></div></div>
+        <div><div class="hint">Intercept A</div><div class="answer">${r.a.toFixed(3)} <span class="hint">± ${r.sigma_a.toFixed(3)} Hz</span></div></div>
+        <div><div class="hint">N</div><div class="answer">${r.n_fit}</div></div><div><div class="hint">StdDev</div><div class="answer">${r.rms.toFixed(3)} Hz</div></div></div>`;
+      h+=`<table><tr><th>Station</th><th class="n">Readings</th><th class="n">Weak (&lt;S/N)</th><th class="n">Outliers</th><th class="n">Used</th><th class="n">Mean DF</th><th class="n">SD</th><th class="n">Residual</th><th>Use</th><th>Note</th></tr>
+        ${r.stations.map(s=>{
+          const forced = c.cal.stations && (s.khz in c.cal.stations);
+          return `<tr class="${s.included?'used':'weak'}"><td>${esc(s.label)}</td><td class="n">${s.lines}</td><td class="n">${s.low_snr}</td><td class="n">${s.outliers}</td><td class="n">${s.n}</td>
+          <td class="n">${s.n?(s.mean_df>=0?'+':'')+s.mean_df.toFixed(3):'-'}</td><td class="n">${s.n>1?s.sd.toFixed(3):'-'}</td><td class="n">${s.included&&r.n_fit>1?(s.resid>=0?'+':'')+s.resid.toFixed(3):''}</td>
+          <td><span class="seg">${['use','auto','drop'].map(v=>`<button class="${(forced? (c.cal.stations[s.khz]?'use':'drop') :'auto')===v?'on':''}" onclick="call('SetCalStation','${c.id}',${s.khz},'${v}')">${v}</button>`).join('')}</span></td>
+          <td class="hint">${esc(s.note)}</td></tr>`}).join('')}</table>`;
+      h+=issuesHTML(r.issues);
+    }
+    h+='</div>';
+  }
+  put('calPanel', h);
+}
+
+function chart(res){
+  const pts=res.lines.filter(l=>!l.flag);
+  if(!pts.length) return '';
+  const used=res.lines.filter(l=>l.used).map(l=>l.fmeas);
+  const mid = used.length? used.reduce((a,b)=>a+b,0)/used.length : pts[0].fmeas;
+  const span=3, W=900, H=150;
+  const t0=pts[0].sec, t1=Math.max(pts[pts.length-1].sec, t0+1);
+  const x=s=>10+(((s-t0+86400)%86400)/((t1-t0+86400)%86400||1))*(W-20);
+  const y=v=>{ const c=Math.max(-span,Math.min(span,v-mid)); return H/2 - c/span*(H/2-12) };
+  let svg=`<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <line x1="0" x2="${W}" y1="${H/2}" y2="${H/2}" stroke="#c9d1dc" stroke-dasharray="4 4"/>
+    <text x="6" y="14" font-size="11" fill="#5f6b7a">${(mid+span).toFixed(2)} Hz</text><text x="6" y="${H-4}" font-size="11" fill="#5f6b7a">${(mid-span).toFixed(2)} Hz</text>`;
+  for(const l of res.lines){
+    const c = l.used? '#1a7f37' : (l.flag||l.snr<20? '#c5ccd6':'#d4a72c');
+    svg+=`<circle cx="${x(l.sec).toFixed(1)}" cy="${y(l.fmeas).toFixed(1)}" r="${l.used?3.5:2.5}" fill="${c}"><title>${l.time} ${l.fmeas.toFixed(3)} Hz S/N ${l.snr}</title></circle>`;
+  }
+  return svg+'</svg><div class="hint">Green: used. Amber: strong but not part of the carrier. Grey: weak. Vertical span ±3 Hz around the mean.</div>';
+}
+
+function renderRuns(){
+  if(!selRun || !S.runs.find(r=>r.run.id===selRun)) selRun=(S.runs.find(r=>r.present)||S.runs[0]).run.id;
+  let h='<div class="row" style="margin-bottom:10px">'+S.runs.map((rv,i)=>`<button class="${rv.run.id===selRun?'primary':''}" onclick="selRun='${rv.run.id}';renderRuns()">Run ${i+1}: ${esc(rv.title)}</button>`).join('')+'</div>';
+  const rv=S.runs.find(r=>r.run.id===selRun), r=rv.run, res=rv.result;
+  h+=`<div class="card"><div class="row"><h2 class="grow">${esc(rv.title)}</h2>
+    <span class="hint">Weak below</span><input class="num" type="number" style="width:60px" value="${r.min_snr}" onchange="call('SetRunOptions','${r.id}',+this.value,${r.trim_edges})"> dB
+    <label class="chk"><input type="checkbox" ${r.trim_edges?'checked':''} onchange="call('SetRunOptions','${r.id}',${r.min_snr},this.checked)"> Drop first and last carrier reading</label>
+    <button onclick="call('ResetRunLines','${r.id}')">Reset my choices</button>
+    ${slotButtons(r.id, rv.present)}</div>
+    ${r.slot.file?`<div class="hint">File: ${esc(r.slot.file)} · from ${esc(r.slot.source)} · scheduled key-down ${hhmm(r.key_down)}-${hhmm(rv.key_up)} UTC</div>`:''}`;
+  if(res){
+    h+=`<div class="row" style="gap:28px;margin:10px 0">
+      <div><div class="hint">Carrier found</div><div class="answer">${res.block_from||'-'} - ${res.block_to||'-'}</div></div>
+      <div><div class="hint">Mean fMeas (n=${res.n})</div><div class="answer">${res.n?res.mean_fmeas.toFixed(3)+' Hz':'-'}</div></div>
+      <div><div class="hint">SD / SEM</div><div class="answer">${res.n>1?res.sd.toFixed(3)+' / '+res.sem.toFixed(3):'-'}</div></div>
+      <div><div class="hint">Dial must be in</div><div class="answer" style="font-size:15px">${res.n?fmtKHz(res.dial_min)+' - '+fmtKHz(res.dial_max):'-'}</div></div>
+      <div><div class="hint">Carrier</div><div class="answer ${rv.ready?'ok':''}">${rv.final_hz!=null?fmtHz(rv.final_hz):'-'}</div></div></div>`;
+    h+=chart(res);
+    h+=issuesHTML([...(rv.issues||[]), ...(res.issues||[])]);
+    h+=`<h3>Readings</h3><div class="scroll"><table><tr><th class="n">Line</th><th>UTC</th><th class="n">kHz</th><th class="n">Offset</th><th class="n">fMeas</th><th class="n">DF</th><th class="n">S/N</th><th>Status</th><th>Use</th></tr>
+      ${res.lines.map(l=>`<tr class="${l.used?'used':''} ${(l.flag||l.snr<r.min_snr)?'weak':''} ${l.forced?'forced':''}"><td class="n">${l.n}</td><td class="mono">${l.time}</td><td class="n">${l.khz}</td><td class="n">${l.offset}</td>
+        <td class="n">${l.fmeas.toFixed(3)}</td><td class="n">${l.df.toFixed(3)}</td><td class="n">${l.snr.toFixed(1)}${l.flag?'*':''}</td><td>${esc(l.status)}</td>
+        <td><span class="seg">${['use','auto','drop'].map(v=>`<button class="${(l.forced?(l.used?'use':'drop'):'auto')===v?'on':''}" onclick="call('ToggleRunLine','${r.id}',${l.n},'${v}')">${v}</button>`).join('')}</span></td></tr>`).join('')}
+      </table></div>`;
+  } else h+=issuesHTML(rv.issues);
+  h+='</div>';
+  put('runsPanel', h);
+}
+
+function renderResults(){
+  let h=`<div class="card"><h2>Measurements to submit</h2><div class="hint">Enter these on the ARRL FMT data entry page. Only runs marked Ready have passed every check.</div>
+    <table style="margin-top:10px"><tr><th>Run</th><th>Key-down</th><th class="n">Dial</th><th class="n">Mean fMeas</th><th class="n">Correction</th><th class="n">Carrier frequency</th><th>Status</th></tr>
+    ${S.runs.map(rv=>`<tr><td>${esc(rv.title)}</td><td>${hhmm(rv.run.key_down)}Z</td><td class="n">${rv.run.dial_hz?fmtHz(rv.run.dial_hz):'-'}</td>
+      <td class="n">${rv.result&&rv.result.n?rv.result.mean_fmeas.toFixed(3):'-'}</td><td class="n">${rv.corr_hz!=null?rv.corr_hz.toFixed(3):'-'}</td>
+      <td class="n"><span class="answer ${rv.ready?'ok':''}" style="font-size:16px">${rv.final_hz!=null?fmtHz(rv.final_hz):'-'}</span></td>
+      <td>${statusChip(rv.ready, rv.present, [...(rv.issues||[]),...((rv.result&&rv.result.issues)||[])])}</td></tr>`).join('')}</table>
+    <div class="row" style="margin-top:12px"><button class="primary" onclick="makeReport()">Save report &amp; show</button><button onclick="copyResults()">Copy results</button><button onclick="api().OpenSessionFolder()">Open session folder</button></div>
+    <div id="reportOut"></div></div>`;
+  put('resultsPanel', h);
+}
+async function makeReport(){ try{ const t=await api().Report(); lastJSON.resultsPanel=null; document.getElementById('reportOut').innerHTML='<pre class="report">'+esc(t)+'</pre>'; toast('Saved "FMT results.txt" in the session folder.') }catch(e){ toast(String(e),true) } }
+async function copyResults(){
+  const t=S.runs.map(rv=>`${rv.title}: ${rv.final_hz!=null?rv.final_hz.toFixed(2)+' Hz':'n/a'}${rv.ready?'':' (check)'}`).join('\r\n');
+  await window.runtime.ClipboardSetText(t); toast('Results copied.');
+}
+
+function renderSetup(){
+  const s=S.session, w=S.wsjtx, f=S.flex;
+  let h=`<div class="grid2"><div>
+  <div class="card"><h2>Session</h2>
+    <div class="kv"><b>Name</b><span>${esc(s.name)}</span><b>Folder</b><span class="mono" style="word-break:break-all">${esc(S.dir)}</span>
+    <b>Callsign</b><span><input value="${esc(s.callsign)}" style="width:120px" onchange="call('SetCallsign',this.value)"></span></div>
+    <div class="row" style="margin-top:10px"><button onclick="newSession()">New session…</button><button onclick="openSession()">Open session…</button><button onclick="api().OpenSessionFolder()">Open folder</button></div>
+    <div class="hint" style="margin-top:6px">Each session keeps its six files (before calibration, four runs, after calibration), your dial entries and the report.</div></div>
+  <div class="card"><h2>WSJT-X log folder</h2>
+    <div class="hint">Where WSJT-X writes fmt.all (File &gt; Open log directory).</div>
+    <div class="row" style="margin-top:6px"><select class="grow" onchange="call('SetWSJTXDir',this.value)">
+      ${[...new Set([w.dir, ...(w.dirs||[])])].map(d=>`<option ${d===w.dir?'selected':''}>${esc(d)}</option>`).join('')}</select>
+      <button onclick="browseDir()">Browse…</button></div>
+    <div class="hint" style="margin-top:6px">${w.ini_found?`WSJT-X calibration in settings: intercept ${w.cal_a} Hz, slope ${w.cal_b} ppm ${(w.cal_a||w.cal_b)?'':'(good: zero)'}`:'WSJT-X.ini not found in this folder.'}</div>
+    ${issuesHTML(w.issues)}</div>
+  <div class="card"><h2>Voice and sound</h2>
+    <div class="row"><label class="chk"><input type="checkbox" ${s.voice?'checked':''} onchange="call('SetVoice',this.checked,${s.volume||100},${s.beeps})"> Voice prompts</label>
+    <label class="chk"><input type="checkbox" ${s.beeps?'checked':''} onchange="call('SetVoice',${s.voice},${s.volume||100},this.checked)"> Beeps</label>
+    <span class="hint">Volume</span><input type="range" min="10" max="100" value="${s.volume||100}" onchange="call('SetVoice',${s.voice},+this.value,${s.beeps})">
+    <button onclick="beep(880,200);setTimeout(()=>say('Voice prompts are working. Key down in thirty seconds.'),250)">Test</button></div>
+    <div class="hint" style="margin-top:6px">${S.voice_ok?'Using the Windows voice.':'Windows voice unavailable; using the browser voice.'} Prompts: calibration start and stop, each call-up (with the dial to set), two minutes, 30 s, a 5-second countdown, key-down, 30 s left, and carrier end.</div></div>
+  </div><div>
+  <div class="card"><h2>Schedule (UTC)</h2><div class="hint">Defaults are the November 13, 2026 test. Call-up is 5 minutes before key-down; the carrier lasts 1 minute.</div>
+    <table style="margin-top:8px"><tr><th>Station</th><th>Band</th><th>Near (kHz)</th><th>Key-down (UTC)</th><th></th></tr>
+    ${S.runs.map(rv=>{ const r=rv.run, kd=new Date(r.key_down).toISOString().substr(0,16).replace('T',' ');
+      return `<tr id="ed-${r.id}"><td><input value="${esc(r.station)}" style="width:80px"></td><td><input value="${esc(r.band)}" style="width:60px"></td>
+      <td><input class="num" value="${r.nominal_khz}" style="width:80px"></td><td><input class="num" value="${kd}" style="width:150px"></td>
+      <td><button class="small" onclick="saveRun('${r.id}')">Save</button></td></tr>`}).join('')}</table></div>
+  <div class="card"><h2>FlexRadio control <span class="muted" style="font-weight:400">(optional)</span></h2>
+    <label class="chk"><input type="checkbox" ${f.enabled?'checked':''} onchange="call('SetFlexEnabled',this.checked)"> Use a FlexRadio on this network to set DIGU and the dial</label>
+    <div class="hint">Leave this off for other radios; everything else works the same. The app never transmits.</div>
+    ${f.enabled? flexSetup(f):''}</div>
+  </div></div>`;
+  put('setupPanel', h);
+}
+function flexSetup(f){
+  const s=S.session.flex, snap=f.snap;
+  let h=`<h3>Radio</h3><div class="row"><select id="flexSel" class="grow">
+      <option value="">${f.radios&&f.radios.length?'Choose a radio found on the network…':'Searching the network (UDP 4992)…'}</option>
+      ${(f.radios||[]).map(r=>`<option value="${esc(r.serial)}" ${r.serial===s.serial?'selected':''}>${esc(r.model)} "${esc(r.nickname)}" ${esc(r.ip)} (${esc(r.status)})</option>`).join('')}</select>
+      <button onclick="flexConnect()">Connect</button></div>
+    <div class="row" style="margin-top:6px"><span class="hint">or IP</span><input id="flexIP" class="num" style="width:150px" value="${esc(s.serial?'':s.ip)}" placeholder="192.168.1.50"><button onclick="call('FlexConnect',document.getElementById('flexIP').value)">Connect to IP</button>
+      ${snap.connected?'<button onclick="call(\'FlexDisconnect\')">Disconnect</button>':''}</div>
+    <div style="margin-top:6px">${snap.connected?`<span class="status ok">Connected: ${esc(snap.model)} "${esc(snap.nickname)}" ${esc(snap.ip)}</span>`: s.ip?`<span class="status warn">Connecting to ${esc(s.ip)}…</span>`:'<span class="status wait">Not connected</span>'}</div>`;
+  if(snap.connected){
+    h+=`<h3>SmartSDR station and slice</h3><div class="row">
+      <select onchange="call('FlexSetStation',this.value)"><option value="">Station…</option>${(snap.stations||[]).map(st=>`<option ${st.name===snap.bound_station?'selected':''}>${esc(st.name)}</option>`).join('')}</select>
+      <select onchange="call('FlexSetSlice',this.value)"><option value="">Slice…</option>${(snap.slices||[]).filter(x=>x.client_handle===snap.bound_handle).map(x=>`<option value="${x.letter}" ${x.letter===s.slice?'selected':''}>Slice ${x.letter}: ${fmtKHz(x.freq_hz)} ${x.mode}</option>`).join('')}</select></div>
+      ${f.slice?`<div class="kv" style="margin-top:8px"><b>Slice ${f.slice.letter}</b><span class="mono">${fmtKHz(f.slice.freq_hz)} ${f.slice.mode}${f.slice.rit_on?' RIT '+f.slice.rit_freq:''}</span></div>`:''}
+      <label class="chk" style="margin-top:8px"><input type="checkbox" ${s.auto_tune?'checked':''} onchange="call('FlexSetAutoTune',this.checked)"> Tune automatically at each call-up</label>
+      <h3>Quick tune (DIGU, dial 1500 Hz below)</h3><div class="row">
+      ${[2500,5000,10000,15000,20000].map(k=>`<button class="small" onclick="tuneTo(${k*1000-1500})">WWV ${k/1000}</button>`).join('')}
+      ${S.runs.map(rv=>`<button class="small" onclick="tuneRun('${rv.run.id}')">${esc(rv.title)}</button>`).join('')}</div>
+      <div class="hint" style="margin-top:6px">Setting the radio also turns RIT off and sets the DIGU offset to 0, so the slice frequency is the true dial.</div>`;
+  }
+  return h+issuesHTML(f.issues);
+}
+async function flexConnect(){ const v=document.getElementById('flexSel').value; if(!v){ toast('Choose a radio first',true); return } call('FlexConnect', v) }
+async function saveRun(id){
+  const tds=[...document.querySelectorAll(`#ed-${id} input`)].map(i=>i.value);
+  try{ await api().EditRun(id, {station:tds[0], band:tds[1], nominal_khz:parseFloat(tds[2]), key_down:tds[3]}); toast('Schedule saved.'); lastJSON={} }catch(e){ toast(String(e),true) }
+  refresh();
+}
+async function browseDir(){ try{ await api().BrowseWSJTXDir() }catch(e){ toast(String(e),true) } refresh() }
+async function newSession(){ const n=prompt('Name for the new session (a folder in Documents\\FMT Assistant):','FMT '+new Date().toISOString().substr(0,10)); if(!n) return; try{ toast('Session folder: '+await api().NewSession(n)) }catch(e){ toast(String(e),true) } lastJSON={}; refresh() }
+async function openSession(){ try{ const p=await api().OpenSession(); if(p) toast('Opened '+p) }catch(e){ toast(String(e),true) } lastJSON={}; refresh() }
+
+// ------------------------------------------------------------------ loop
+let busy=false;
+async function refresh(){
+  if(busy) return; busy=true;
+  try{ S=await api().GetState(); render() }catch(e){ console.error(e) } finally{ busy=false }
+}
+window.addEventListener('DOMContentLoaded', ()=>{
+  showTab(safeGet('tab')||'night');
+  window.runtime.EventsOn('changed', refresh);
+  refresh(); setInterval(refresh, 1500);
+  setInterval(tick, 200); tick();
+  // Audio needs a user gesture before it may play.
+  document.addEventListener('click', ()=>{ try{ actx = actx || new AudioContext(); actx.resume() }catch(e){} }, {once:true});
+});
+</script>
+</body>
+</html>

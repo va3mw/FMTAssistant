@@ -1,0 +1,17 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "FMTAssistant",
+  "outputfilename": "FMTAssistant",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dir": "frontend",
+  "wailsjsdir": "",
+  "author": {
+    "name": "Michael VA3MW"
+  },
+  "info": {
+    "productName": "FMT Assistant",
+    "productVersion": "0.1.0",
+    "comments": "ARRL Frequency Measuring Test helper for WSJT-X FreqCal"
+  }
+}
