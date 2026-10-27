@@ -246,6 +246,11 @@ type RunOptions struct {
 	// Key-down window in UTC seconds of day; -1 when unknown.
 	KeyDownStart int `json:"-"`
 	KeyDownEnd   int `json:"-"`
+	// ForceWindow always keeps only readings inside the key-down window
+	// (practice on a continuous carrier, where the whole file is strong).
+	ForceWindow bool `json:"-"`
+	// AllowReference accepts a run measured on a WWV/CHU frequency.
+	AllowReference bool `json:"-"`
 }
 
 // RunLine is a line with the reason it was or wasn't used.
@@ -353,7 +358,7 @@ func AnalyzeRun(f *File, opt RunOptions) *RunResult {
 		// Strong CW-ID readings can run straight into the key-down. When the
 		// carrier sits on its scheduled time, drop readings outside it. A
 		// reading's time is the end of its ~4.6 s analysis window.
-		if inWindow(b) {
+		if inWindow(b) || (opt.ForceWindow && opt.KeyDownStart >= 0) {
 			within := func(s int) bool {
 				return SecDiff(s, opt.KeyDownStart) >= 0 && SecDiff(opt.KeyDownEnd+5, s) >= 0
 			}
@@ -363,7 +368,7 @@ func AnalyzeRun(f *File, opt RunOptions) *RunResult {
 					in++
 				}
 			}
-			if in*2 >= b.to-b.from+1 {
+			if in*2 >= b.to-b.from+1 || (opt.ForceWindow && in > 0) {
 				for i := b.from; i <= b.to; i++ {
 					if !within(lines[i].Sec) {
 						lines[i].Used, lines[i].Status = false, "outside key-down time"
@@ -454,7 +459,7 @@ func AnalyzeRun(f *File, opt RunOptions) *RunResult {
 	res.DialMin = int64(res.KHz)*1000 - int64(res.Offset)
 	res.DialMax = res.DialMin + 999
 
-	if _, isRef := LookupReference(res.KHz); isRef {
+	if _, isRef := LookupReference(res.KHz); isRef && !opt.AllowReference {
 		res.Issues = append(res.Issues, errorf("This file was measured at %s, a calibration frequency. It looks like a calibration file, not a test run.", fmtKHz(res.KHz)))
 	}
 	if res.N < 3 {

@@ -72,6 +72,9 @@ type Session struct {
 	CalBefore Cal    `json:"cal_before"`
 	CalAfter  Cal    `json:"cal_after"`
 	Runs      []Run  `json:"runs"`
+	// Practice is a free-standing run on any steady carrier (an AM
+	// broadcast station or WWV). It is never part of the results.
+	Practice Run `json:"practice"`
 	// CalMode picks the correction: "before", "after", "average" or "none".
 	CalMode string `json:"cal_mode"`
 	Voice   bool   `json:"voice"`
@@ -103,6 +106,8 @@ func Default() *Session {
 			run("run3", "W8RKO", "80 m", 3598, kd(3, 4)),
 			run("run4", "K5CM", "80 m", 3599, kd(3, 19)),
 		},
+		Practice: Run{ID: "practice", Station: "Practice", NominalKHz: 1010, CarrierHz: 1010e3,
+			MinSNR: 20, TrimEdges: true},
 		CalMode: "average",
 		Voice:   true,
 		Volume:  100,
@@ -153,8 +158,11 @@ func (s *Session) Save() error {
 	return os.Rename(tmp, filepath.Join(s.dir, fileName))
 }
 
-// Run finds a run by id.
+// Run finds a run by id (including "practice").
 func (s *Session) Run(id string) *Run {
+	if id == "practice" {
+		return &s.Practice
+	}
 	for i := range s.Runs {
 		if s.Runs[i].ID == id {
 			return &s.Runs[i]
@@ -192,6 +200,8 @@ func (s *Session) SlotFileName(id string) string {
 		return "1_calibration_before.all"
 	case "cal_after":
 		return "6_calibration_after.all"
+	case "practice":
+		return fmt.Sprintf("0_practice_%skHz.all", strconv.FormatFloat(s.Practice.NominalKHz, 'f', -1, 64))
 	}
 	for i, r := range s.Runs {
 		if r.ID == id {
@@ -248,7 +258,8 @@ func WSJTXDirs() []string {
 }
 
 // ParseDial reads a dial frequency typed in Hz, kHz or MHz. A unit may be
-// given; otherwise the size of the number decides (HF only, 1.8-30 MHz).
+// given; otherwise the size of the number decides. The range is the AM
+// broadcast band (for practice) up to 30 MHz.
 func ParseDial(text string) (float64, error) {
 	t := strings.ToLower(strings.TrimSpace(text))
 	if t == "" {
@@ -280,8 +291,8 @@ func ParseDial(text string) (float64, error) {
 		}
 	}
 	hz := math.Round(v*mult*1000) / 1000
-	if hz < 1.7e6 || hz > 30e6 {
-		return 0, fmt.Errorf("%.3f kHz is outside the HF range; type the dial in kHz, e.g. 7062.500", hz/1000)
+	if hz < 500e3 || hz > 30e6 {
+		return 0, fmt.Errorf("%.3f kHz is outside 500 kHz-30 MHz; type the dial in kHz, e.g. 7062.500", hz/1000)
 	}
 	return hz, nil
 }

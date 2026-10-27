@@ -16,7 +16,7 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-const version = "0.1.0"
+const version = "0.2.0"
 
 func main() {
 	cfg, _ := os.UserConfigDir()
@@ -24,6 +24,10 @@ func main() {
 	l.Log(logx.Info, "app", "FMT Assistant %s starting", version)
 
 	app := NewApp(l)
+	lock := &options.SingleInstanceLock{UniqueId: "va3mw-fmtassistant-1"}
+	if os.Getenv("FMTASSISTANT_NO_LOCK") != "" { // development: run beside an installed copy
+		lock = nil
+	}
 	err := wails.Run(&options.App{
 		Title:     "FMT Assistant " + version,
 		Width:     1280,
@@ -37,9 +41,7 @@ func main() {
 		OnStartup:        app.startup,
 		OnShutdown:       app.shutdown,
 		Bind:             []interface{}{app},
-		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId: "va3mw-fmtassistant-1",
-		},
+		SingleInstanceLock: lock,
 		Windows: &windows.Options{},
 	})
 	if err != nil {

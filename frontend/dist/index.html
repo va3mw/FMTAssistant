@@ -144,6 +144,7 @@ pre.report{background:#0f141c;color:#d7e0ec;padding:12px;border-radius:8px;font-
   <button data-tab="cal" onclick="showTab('cal')">Calibration<span class="badge" id="bCal" hidden></span></button>
   <button data-tab="runs" onclick="showTab('runs')">Run analysis<span class="badge" id="bRuns" hidden></span></button>
   <button data-tab="results" onclick="showTab('results')">Results</button>
+  <button data-tab="practice" onclick="showTab('practice')">Practice</button>
   <button data-tab="setup" onclick="showTab('setup')">Setup &amp; radio<span class="badge" id="bSetup" hidden></span></button>
 </nav>
 <main>
@@ -151,6 +152,7 @@ pre.report{background:#0f141c;color:#d7e0ec;padding:12px;border-radius:8px;font-
   <section class="tab" id="tab-cal"><div id="calPanel"></div></section>
   <section class="tab" id="tab-runs"><div id="runsPanel"></div></section>
   <section class="tab" id="tab-results"><div id="resultsPanel"></div></section>
+  <section class="tab" id="tab-practice"><div id="practicePanel"></div></section>
   <section class="tab" id="tab-setup"><div id="setupPanel"></div></section>
 </main>
 <div class="toast" id="toast"></div>
@@ -169,6 +171,8 @@ function commas(n){ return Math.trunc(n).toString().replace(/\B(?=(\d{3})+(?!\d)
 function fmtKHz(hz){ if(!hz) return '-'; const k=Math.round(hz)/1000; const w=Math.floor(k); return commas(w)+'.'+String(Math.round((k-w)*1000)).padStart(3,'0')+' kHz' }
 function fmtHz(hz){ if(hz==null) return '-'; let w=Math.floor(hz), c=Math.round((hz-w)*100); if(c===100){w++;c=0} return commas(w)+'.'+String(c).padStart(2,'0')+' Hz' }
 function hhmm(t){ const d=new Date(t); return d.toISOString().substr(11,5) }
+function hhmmss(t){ return new Date(t).toISOString().substr(11,8) }
+function started(r){ return new Date(r.key_down).getUTCFullYear() > 2000 }
 function local(t){ return new Date(t).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}) }
 function dur(sec){ sec=Math.max(0,Math.round(sec)); if(sec>=86400) return Math.floor(sec/86400)+'d '+dur(sec%86400); const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s=sec%60; return (h? h+':'+String(m).padStart(2,'0') : m)+':'+String(s).padStart(2,'0') }
 function toast(msg, err){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast on'+(err?' err':''); clearTimeout(t._h); t._h=setTimeout(()=>t.className='toast', err?7000:3500) }
@@ -240,6 +244,18 @@ function events(){
     ev.push({id:r.id+'-ku', t:kd+60e3, run:rv, label:rv.title+' carrier ends', slot:r.id,
       say:`Carrier ended. Press Capture for ${speakTitle(rv)}, and enter the dial you used.`, longbeep:true});
   });
+  const p=S.practice;
+  if(p && started(p.run)){
+    const kd=new Date(p.run.key_down).getTime(), tag='@'+kd;
+    ev.push({id:'p-1min'+tag, t:kd-60e3, run:p, label:'Practice: one minute to measure',
+      say:'One minute. Centre the tone near fifteen hundred hertz, then type the exact dial.'});
+    ev.push({id:'p-30s'+tag, t:kd-30e3, run:p, label:'Practice: hands off the dial', say:'Thirty seconds. Do not touch the dial.'});
+    for(let i=5;i>=1;i--) ev.push({id:'p-pip'+i+tag, t:kd-i*1e3, quiet:true, pip:true});
+    ev.push({id:'p-kd'+tag, t:kd, run:p, label:'Practice measuring', say:'Practice key down. Measuring for one minute.', longbeep:true, note:true});
+    ev.push({id:'p-30left'+tag, t:kd+30e3, run:p, label:'Practice: 30 s left', say:'Thirty seconds left.'});
+    ev.push({id:'p-ku'+tag, t:kd+60e3, run:p, label:'Practice: capture', slot:'practice',
+      say:'Practice minute is over. Press Capture on the practice tab, and enter the dial you used.', longbeep:true});
+  }
   ev.push({id:'cala-start', t:lastUp+60e3, label:'Start after calibration', slot:'cal_after',
     say:'All runs are done. Start the after calibration on W W V, let it run several cycles, then capture it.', beep:true});
   return ev.sort((a,b)=>a.t-b.t);
@@ -261,8 +277,9 @@ function fire(e){
 // Phase of the test right now, for the banner.
 function phase(now){
   if(!S) return null;
-  for(const rv of S.runs){
-    const cu=new Date(rv.call_up).getTime(), kd=new Date(rv.run.key_down).getTime(), ku=kd+60e3;
+  const all=[...S.runs]; if(S.practice && started(S.practice.run)) all.unshift(S.practice);
+  for(const rv of all){
+    const cu=rv.run.id==='practice' ? new Date(rv.run.key_down).getTime()-300e3 : new Date(rv.call_up).getTime(), kd=new Date(rv.run.key_down).getTime(), ku=kd+60e3;
     if(now>=kd && now<ku) return {kind:'carrier', rv, left:(ku-now)/1000};
     if(now>=cu && now<kd) return {kind:'callup', rv, left:(kd-now)/1000};
     if(now>=ku && now<ku+4*60e3 && !rv.present) return {kind:'capture', rv};
@@ -328,8 +345,9 @@ async function capture(id){
 }
 async function loadSlot(id){ try{ const m=await api().LoadSlot(id); if(m) toast(m) }catch(e){ toast(String(e),true) } refresh() }
 async function clearSlot(id){ if(confirm('Remove this file from the session? (It stays in the session folder, renamed.)')) call('ClearSlot', id) }
+function runById(id){ return id==='practice'? S.practice : S.runs.find(r=>r.run.id===id) }
 async function tuneRun(id){
-  const rv=S.runs.find(r=>r.run.id===id);
+  const rv=runById(id);
   try{ toast(await api().FlexTune(rv.suggest_dial_hz)) }catch(e){ toast(String(e),true) }
 }
 async function tuneTo(hz){ try{ toast(await api().FlexTune(hz)) }catch(e){ toast(String(e),true) } }
@@ -341,7 +359,7 @@ async function setDial(id, el){
 async function useRadioDial(id){ try{ toast(await api().UseRadioDial(id)) }catch(e){ toast(String(e),true) } refresh() }
 async function setCarrier(id, el){ await call('SetCarrier', id, el.value) }
 async function retone(id){
-  const rv=S.runs.find(r=>r.run.id===id);
+  const rv=runById(id);
   const tone=parseFloat(prompt('Audio frequency of the carrier on the WSJT-X waterfall now (Hz)?', '1500'));
   if(!(tone>0)) return;
   const sl=S.flex.slice;
@@ -365,7 +383,7 @@ function render(){
   badge('bCal', S.cals.reduce((n,c)=>n+errCount(c.issues)+errCount(c.result&&c.result.issues),0));
   badge('bRuns', S.runs.reduce((n,r)=>n+errCount(r.result&&r.result.issues),0));
   badge('bSetup', errCount(S.wsjtx.issues)+errCount(f.issues));
-  renderTimeline(); renderSide(); renderCal(); renderRuns(); renderResults(); renderSetup();
+  renderTimeline(); renderSide(); renderCal(); renderRuns(); renderResults(); renderPractice(); renderSetup();
 }
 function badge(id,n){ const b=document.getElementById(id); b.hidden=!n; b.textContent=n }
 
@@ -515,13 +533,19 @@ function chart(res){
 function renderRuns(){
   if(!selRun || !S.runs.find(r=>r.run.id===selRun)) selRun=(S.runs.find(r=>r.present)||S.runs[0]).run.id;
   let h='<div class="row" style="margin-bottom:10px">'+S.runs.map((rv,i)=>`<button class="${rv.run.id===selRun?'primary':''}" onclick="selRun='${rv.run.id}';renderRuns()">Run ${i+1}: ${esc(rv.title)}</button>`).join('')+'</div>';
-  const rv=S.runs.find(r=>r.run.id===selRun), r=rv.run, res=rv.result;
-  h+=`<div class="card"><div class="row"><h2 class="grow">${esc(rv.title)}</h2>
+  h+=runDetail(S.runs.find(r=>r.run.id===selRun));
+  put('runsPanel', h);
+}
+
+// runDetail is the readings card for a run (also used for practice).
+function runDetail(rv){
+  const r=rv.run, res=rv.result;
+  let h=`<div class="card"><div class="row"><h2 class="grow">${esc(rv.title)}</h2>
     <span class="hint">Weak below</span><input class="num" type="number" style="width:60px" value="${r.min_snr}" onchange="call('SetRunOptions','${r.id}',+this.value,${r.trim_edges})"> dB
     <label class="chk"><input type="checkbox" ${r.trim_edges?'checked':''} onchange="call('SetRunOptions','${r.id}',${r.min_snr},this.checked)"> Drop first and last carrier reading</label>
     <button onclick="call('ResetRunLines','${r.id}')">Reset my choices</button>
     ${slotButtons(r.id, rv.present)}</div>
-    ${r.slot.file?`<div class="hint">File: ${esc(r.slot.file)} · from ${esc(r.slot.source)} · scheduled key-down ${hhmm(r.key_down)}-${hhmm(rv.key_up)} UTC</div>`:''}`;
+    ${r.slot.file?`<div class="hint">File: ${esc(r.slot.file)} · from ${esc(r.slot.source)}${started(r)?` · ${r.id==='practice'?'measuring':'scheduled key-down'} ${hhmmss(r.key_down)}-${hhmmss(rv.key_up)} UTC`:''}</div>`:''}`;
   if(res){
     h+=`<div class="row" style="gap:28px;margin:10px 0">
       <div><div class="hint">Carrier found</div><div class="answer">${res.block_from||'-'} - ${res.block_to||'-'}</div></div>
@@ -537,8 +561,7 @@ function renderRuns(){
         <td><span class="seg">${['use','auto','drop'].map(v=>`<button class="${(l.forced?(l.used?'use':'drop'):'auto')===v?'on':''}" onclick="call('ToggleRunLine','${r.id}',${l.n},'${v}')">${v}</button>`).join('')}</span></td></tr>`).join('')}
       </table></div>`;
   } else h+=issuesHTML(rv.issues);
-  h+='</div>';
-  put('runsPanel', h);
+  return h+'</div>';
 }
 
 function renderResults(){
@@ -556,6 +579,89 @@ async function makeReport(){ try{ const t=await api().Report(); lastJSON.results
 async function copyResults(){
   const t=S.runs.map(rv=>`${rv.title}: ${rv.final_hz!=null?rv.final_hz.toFixed(2)+' Hz':'n/a'}${rv.ready?'':' (check)'}`).join('\r\n');
   await window.runtime.ClipboardSetText(t); toast('Results copied.');
+}
+
+// ------------------------------------------------------------------ practice
+const WWV=[2500,5000,10000,15000,20000,25000];
+function renderPractice(){
+  const pv=S.practice, r=pv.run, flexOn=S.session.flex.enabled, now=Date.now();
+  const kd=started(r)? new Date(r.key_down).getTime() : 0;
+  const isWWV=WWV.some(k=>Math.abs(k-r.nominal_khz)<0.01);
+  let state;
+  if(!kd) state='<span class="status wait">Not started</span>';
+  else if(now<kd) state=`<span class="status warn">Measuring starts in ${dur((kd-now)/1000)}</span>`;
+  else if(now<kd+60e3) state=`<span class="status bad">Measuring · ${dur((kd+60e3-now)/1000)} left</span>`;
+  else state=pv.present? '<span class="status ok">Captured</span>' : '<span class="status warn">Minute over: press Capture</span>';
+  const dev = pv.final_hz!=null ? pv.final_hz-r.nominal_khz*1000 : null;
+  let h=`<div class="grid2"><div>
+  <div class="card"><h2>Practice on an AM broadcast station</h2>
+    <p style="margin:6px 0">Any steady carrier works for practice. Your local AM broadcast station is strong day and night, and its
+    carrier sits on a round frequency (a multiple of 10 kHz in the Americas, 9 kHz elsewhere). That lets you rehearse the whole
+    test-night routine whenever you like: set the dial, centre the tone, type the dial, measure for one minute, capture, and read the answer.</p>
+    <ol class="steps">
+      <li>Type the station's frequency in kHz (for example 1010), or pick WWV.</li>
+      <li>Choose how long you need to get ready, then press <b>Start practice</b>. The app starts a fresh fmt.all and counts down to a one-minute
+      measuring window with the same voice prompts as test night.</li>
+      <li>In WSJT-X: <b>Mode &gt; FreqCal</b>, calibration cycle <b>off</b>, <b>Measure</b> on. Set <b>USB</b> (DIGU on a Flex) to the dial shown.</li>
+      <li>Centre the tone near 1500 Hz (press <b>Tone is at…</b> if it isn't), type the exact dial, then keep your hands off the dial.</li>
+      <li>When the minute is over, press <b>Capture</b>. The answer, and how far it is from the station's nominal frequency, appear here.</li>
+    </ol>
+    <div class="hint">The radio must receive the AM broadcast band; most HF transceivers and all FlexRadio 6000 models do.
+    Run a WWV calibration first (Test night tab) if you want the answer corrected for your radio's error. Without one, the practice answer is uncorrected.</div>
+  </div>
+  <div class="card"><h2>How to judge the result</h2>
+    <ul class="steps">
+      <li><b>AM broadcast stations are not frequency standards.</b> Many are within a hertz or two of nominal, and some are GPS-locked,
+      but the legal tolerance is ±20 Hz. VA3MW measured local carriers at +1.8, +0.8 and −0.5 Hz. If the same offset shows up night after night, it belongs to the station, not to you.
+      What matters in practice is that the routine works and the readings are steady (SD of a few tenths of a hertz).</li>
+      <li><b>WWV is exact</b>, so a calibrated radio should land within about 0.3 Hz. If you calibrated on the same WWV frequency, the check is circular and will look perfect.</li>
+      <li>Never use an AM station in your real calibration. That's why the Calibration tab leaves out stations that aren't WWV.</li>
+    </ul>
+  </div>
+  </div><div>
+  <div class="card"><div class="row"><h2 class="grow">Practice run</h2>${state}</div>
+    <div class="kv" style="margin-top:8px">
+      <b>Station frequency</b><span><input id="pFreq" class="num" style="width:110px" value="${r.nominal_khz}"> kHz
+        ${WWV.slice(1,4).map(k=>`<button class="small" onclick="document.getElementById('pFreq').value=${k}">WWV ${k/1000}</button>`).join(' ')}</span>
+      <b>Start measuring in</b><span><select id="pLead">${[[60,'1 minute'],[120,'2 minutes'],[300,'5 minutes']].map(([v,l])=>`<option value="${v}" ${v===120?'selected':''}>${l}</option>`).join('')}</select>
+        <label class="chk"><input id="pFresh" type="checkbox" checked> Start a fresh fmt.all</label></span>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="primary" onclick="startPractice()">${kd?'Restart practice':'Start practice'}</button>
+      ${kd&&now<kd+60e3?`<button onclick="call('CancelPractice')">Cancel countdown</button>`:''}</div>
+    ${kd?`<div class="hint" style="margin-top:6px">Measuring minute: ${hhmmss(r.key_down)}-${hhmmss(pv.key_up)} UTC</div>`:''}
+    <h3>Dial</h3>
+    <div class="kv">
+      <b>Carrier (estimate)</b><span><input class="num" style="width:120px" value="${(r.carrier_hz/1000).toFixed(3)}" onchange="setCarrier('practice',this)"> kHz
+        <button class="small" onclick="retone('practice')">Tone is at…</button></span>
+      <b>Set dial to</b><span class="bigdial">${fmtKHz(pv.suggest_dial_hz)}</span>
+      <b>Dial you used</b><span><input class="num" style="width:150px" placeholder="e.g. ${(pv.suggest_dial_hz/1000).toFixed(3)}" value="${esc(r.dial_text)}" onchange="setDial('practice',this)"> <span class="hint">${r.dial_hz?('= '+fmtHz(r.dial_hz)):'kHz'}</span>
+        ${flexOn?`<button class="small" onclick="useRadioDial('practice')">From radio</button>`:''}</span>
+    </div>
+    ${flexOn?`<div class="row" style="margin-top:8px"><button class="primary" onclick="tuneRun('practice')">Set radio: DIGU ${fmtKHz(pv.suggest_dial_hz)}</button></div>`:''}
+    <h3>Result</h3>
+    <div class="kv">
+      <b>Mean fMeas</b><span class="mono">${pv.result&&pv.result.n? pv.result.mean_fmeas.toFixed(3)+' Hz (n='+pv.result.n+', sd '+pv.result.sd.toFixed(2)+')':'-'}</span>
+      <b>Correction</b><span class="mono">${pv.corr_hz!=null? (pv.corr_hz>=0?'+':'')+pv.corr_hz.toFixed(3)+' Hz':'-'}</span>
+      <b>Carrier</b><span class="answer ${pv.ready?'ok':''}">${pv.final_hz!=null? fmtHz(pv.final_hz):'-'}</span>
+      <b>vs nominal</b><span class="answer">${dev!=null? (dev>=0?'+':'')+dev.toFixed(2)+' Hz':'-'}</span>
+    </div>
+    ${dev!=null?`<div class="hint" style="margin-top:4px">${isWWV?'WWV is exact: within ±0.3 Hz is excellent for a calibrated radio.':'Broadcast carriers are often 1-2 Hz off nominal. Compare with other nights rather than expecting zero.'}</div>`:''}
+    <div class="row" style="margin-top:10px">${slotButtons('practice', pv.present)}</div>
+  </div>
+  </div></div>`;
+  if(pv.present) h+=runDetail(pv);
+  put('practicePanel', h);
+}
+async function startPractice(){
+  const f=document.getElementById('pFreq').value, lead=+document.getElementById('pLead').value, fresh=document.getElementById('pFresh').checked;
+  if(S.practice.present && !confirm('Start a new practice run? The current practice file is kept in the session folder, renamed.')) return;
+  try{
+    const m=await api().StartPractice(f, lead, fresh); toast(m); lastJSON.practicePanel=null; await refresh();
+    const p=S.practice;
+    beep(880,200);
+    setTimeout(()=>say(`Practice run on ${spokenKHz(p.run.carrier_hz)}. Set U S B dial to ${spokenKHz(p.suggest_dial_hz)}. Mode FreqCal, calibration cycle off, Measure on. Measuring starts in ${lead>=120? (lead/60)+' minutes':'one minute'}.`),250);
+    if(S.session.flex.enabled && S.session.flex.auto_tune) tuneRun('practice');
+  }catch(e){ toast(String(e),true) }
 }
 
 function renderSetup(){

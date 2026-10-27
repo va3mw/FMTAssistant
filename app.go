@@ -165,6 +165,7 @@ type State struct {
 	WSJTX    WSJTXView        `json:"wsjtx"`
 	Cals     []CalView        `json:"cals"`
 	Runs     []RunView        `json:"runs"`
+	Practice RunView          `json:"practice"`
 	Flex     FlexView         `json:"flex"`
 	VoiceOK  bool             `json:"voice_ok"`
 	Problems int              `json:"problems"`
@@ -205,67 +206,18 @@ func (a *App) GetState() State {
 		st.Cals = append(st.Cals, cv)
 	}
 	before, after := st.Cals[0].Result, st.Cals[1].Result
-	calOK := func(c *fmtdata.CalResult) bool { return c != nil && c.OK && !fmtdata.HasErrors(c.Issues) }
 
 	// Runs.
 	for i := range s.Runs {
-		r := &s.Runs[i]
-		rv := RunView{Run: *r, Title: r.Title(), CallUp: r.CallUp(), KeyUp: r.KeyUp(),
-			FileName: s.SlotFileName(r.ID), SuggestDialHz: math.Round(r.CarrierHz - 1500)}
-		f, err := a.loadSlot(r.Slot)
-		if err != nil {
-			rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "error", Msg: err.Error()})
-		}
+		rv, f := a.runView(&s.Runs[i], false, before, after)
 		if f != nil {
-			rv.Present = true
-			files[r.ID] = f
-			kd := secOfDay(r.KeyDown)
-			res := fmtdata.AnalyzeRun(f, fmtdata.RunOptions{MinSNR: r.MinSNR, TrimEdges: r.TrimEdges,
-				Overrides: r.Overrides, KeyDownStart: kd, KeyDownEnd: kd + 60})
-			rv.Result = res
-			rv.Issues = append(rv.Issues, a.checkRun(r, res, f)...)
-			if res.N > 0 {
-				fMHz := (r.DialHz + res.MeanFMeas) / 1e6
-				if r.DialHz == 0 {
-					fMHz = float64(res.KHz) / 1000
-				}
-				if calOK(before) {
-					v := before.Correction(fMHz)
-					rv.CorrBefore = &v
-				}
-				if calOK(after) {
-					v := after.Correction(fMHz)
-					rv.CorrAfter = &v
-				}
-				corr, cerr := pickCorrection(s.CalMode, rv.CorrBefore, rv.CorrAfter)
-				if cerr != "" {
-					rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "error", Msg: cerr})
-				} else {
-					rv.CorrHz = &corr
-				}
-				if rv.CorrBefore != nil && rv.CorrAfter != nil && math.Abs(*rv.CorrBefore-*rv.CorrAfter) > 0.3 {
-					rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "warn", Msg: fmt.Sprintf(
-						"The before and after calibrations differ by %.2f Hz here, so the radio drifted. Averaging them is usually best.",
-						math.Abs(*rv.CorrBefore-*rv.CorrAfter))})
-				}
-				if r.DialHz > 0 && rv.CorrHz != nil {
-					v := r.DialHz + res.MeanFMeas - *rv.CorrHz
-					rv.FinalHz = &v
-					if math.Abs(v-r.NominalKHz*1000) > 1500 {
-						rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "warn", Msg: fmt.Sprintf(
-							"The answer is %.3f kHz from the published %.0f kHz. Check the dial entry and that this is the right file.",
-							(v-r.NominalKHz*1000)/1000, r.NominalKHz)})
-					}
-				}
-			}
-		} else if err == nil {
-			rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "info", Msg: "No file yet. After the carrier ends, press Capture (or Load to pick a saved file)."})
+			files[s.Runs[i].ID] = f
 		}
-		if r.DialHz == 0 {
-			rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "error", Msg: "Enter the exact dial frequency you used for this run."})
-		}
-		rv.Ready = rv.FinalHz != nil && !fmtdata.HasErrors(rv.Issues) && !fmtdata.HasErrors(resIssues(rv.Result))
 		st.Runs = append(st.Runs, rv)
+	}
+	pv, pf := a.runView(&s.Practice, true, before, after)
+	if pf != nil {
+		files["practice"] = pf
 	}
 
 	// The same file must not be used twice.
@@ -290,7 +242,12 @@ func (a *App) GetState() State {
 				st.Runs[i].Ready = false
 			}
 		}
+		if contains(ids, "practice") {
+			pv.Issues = append(pv.Issues, fmtdata.Issue{Level: "error", Msg: msg})
+			pv.Ready = false
+		}
 	}
+	st.Practice = pv
 	for _, c := range st.Cals {
 		st.Problems += countErrors(c.Issues)
 		if c.Result != nil {
@@ -306,9 +263,83 @@ func (a *App) GetState() State {
 	return st
 }
 
+// runView analyses one run (or the practice run) and returns it with the
+// parsed file.
+func (a *App) runView(r *session.Run, practice bool, before, after *fmtdata.CalResult) (RunView, *fmtdata.File) {
+	s := a.sess
+	calOK := func(c *fmtdata.CalResult) bool { return c != nil && c.OK && !fmtdata.HasErrors(c.Issues) }
+	rv := RunView{Run: *r, Title: r.Title(), CallUp: r.CallUp(), KeyUp: r.KeyUp(),
+		FileName: s.SlotFileName(r.ID), SuggestDialHz: math.Round(r.CarrierHz - 1500)}
+	f, err := a.loadSlot(r.Slot)
+	if err != nil {
+		rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "error", Msg: err.Error()})
+	}
+	if f != nil {
+		rv.Present = true
+		kd := -1
+		if !r.KeyDown.IsZero() {
+			kd = secOfDay(r.KeyDown)
+		}
+		res := fmtdata.AnalyzeRun(f, fmtdata.RunOptions{MinSNR: r.MinSNR, TrimEdges: r.TrimEdges,
+			Overrides: r.Overrides, KeyDownStart: kd, KeyDownEnd: kd + 60,
+			ForceWindow: practice, AllowReference: practice})
+		if kd < 0 {
+			res.Issues = append(res.Issues, fmtdata.Issue{Level: "info", Msg: "No measuring minute was set, so the whole file was searched for the carrier."})
+		}
+		rv.Result = res
+		rv.Issues = append(rv.Issues, a.checkRun(r, res, f, practice)...)
+		if res.N > 0 {
+			fMHz := (r.DialHz + res.MeanFMeas) / 1e6
+			if r.DialHz == 0 {
+				fMHz = float64(res.KHz) / 1000
+			}
+			if calOK(before) {
+				v := before.Correction(fMHz)
+				rv.CorrBefore = &v
+			}
+			if calOK(after) {
+				v := after.Correction(fMHz)
+				rv.CorrAfter = &v
+			}
+			corr, cerr := pickCorrection(s.CalMode, rv.CorrBefore, rv.CorrAfter)
+			switch {
+			case cerr != "" && practice:
+				corr = 0
+				rv.CorrHz = &corr
+				rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "info", Msg: "No usable calibration in this session, so the practice result is not corrected for your radio's error."})
+			case cerr != "":
+				rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "error", Msg: cerr})
+			default:
+				rv.CorrHz = &corr
+			}
+			if rv.CorrBefore != nil && rv.CorrAfter != nil && math.Abs(*rv.CorrBefore-*rv.CorrAfter) > 0.3 {
+				rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "warn", Msg: fmt.Sprintf(
+					"The before and after calibrations differ by %.2f Hz here, so the radio drifted. Averaging them is usually best.",
+					math.Abs(*rv.CorrBefore-*rv.CorrAfter))})
+			}
+			if r.DialHz > 0 && rv.CorrHz != nil {
+				v := r.DialHz + res.MeanFMeas - *rv.CorrHz
+				rv.FinalHz = &v
+				if math.Abs(v-r.NominalKHz*1000) > 1500 {
+					rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "warn", Msg: fmt.Sprintf(
+						"The answer is %.3f kHz from the published %.0f kHz. Check the dial entry and that this is the right file.",
+						(v-r.NominalKHz*1000)/1000, r.NominalKHz)})
+				}
+			}
+		}
+	} else if err == nil {
+		rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "info", Msg: "No file yet. After the carrier ends, press Capture (or Load to pick a saved file)."})
+	}
+	if r.DialHz == 0 {
+		rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "error", Msg: "Enter the exact dial frequency you used for this run."})
+	}
+	rv.Ready = rv.FinalHz != nil && !fmtdata.HasErrors(rv.Issues) && !fmtdata.HasErrors(resIssues(rv.Result))
+	return rv, f
+}
+
 // checkRun cross-checks a run file against its schedule, the dial entry,
 // the radio's dial log and the other runs.
-func (a *App) checkRun(r *session.Run, res *fmtdata.RunResult, f *fmtdata.File) []fmtdata.Issue {
+func (a *App) checkRun(r *session.Run, res *fmtdata.RunResult, f *fmtdata.File, practice bool) []fmtdata.Issue {
 	var is []fmtdata.Issue
 	add := func(level, format string, args ...any) {
 		is = append(is, fmtdata.Issue{Level: level, Msg: fmt.Sprintf(format, args...)})
@@ -339,7 +370,7 @@ func (a *App) checkRun(r *session.Run, res *fmtdata.RunResult, f *fmtdata.File) 
 	// Readings that fall in another run's time slot mean fmt.all was not
 	// captured between runs.
 	for _, o := range a.sess.Runs {
-		if o.ID == r.ID {
+		if o.ID == r.ID || practice {
 			continue
 		}
 		cu, ku := secOfDay(o.CallUp()), secOfDay(o.KeyUp())
@@ -705,6 +736,49 @@ func (a *App) SetCarrier(id, text string) error {
 		a.saveLocked()
 	}
 	return nil
+}
+
+// StartPractice sets up a practice run on a steady carrier (an AM broadcast
+// station or WWV): it clears the previous practice, optionally starts a fresh
+// fmt.all, and schedules a one-minute measuring window leadSec from now.
+func (a *App) StartPractice(freqText string, leadSec int, freshFmt bool) (string, error) {
+	hz, err := session.ParseDial(freqText)
+	if err != nil {
+		return "", err
+	}
+	if leadSec < 30 || leadSec > 3600 {
+		return "", fmt.Errorf("the lead time must be between 30 seconds and an hour")
+	}
+	msg := ""
+	if freshFmt {
+		if msg, err = a.ClearFmtAll(); err != nil {
+			return "", err
+		}
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	p := &a.sess.Practice
+	if p.Slot.File != "" {
+		old := a.sess.Path(p.Slot.File)
+		_ = os.Rename(old, strings.TrimSuffix(old, ".all")+"-removed-"+time.Now().UTC().Format("20060102-150405")+".all")
+	}
+	*p = session.Run{ID: "practice", Station: "Practice", NominalKHz: hz / 1000, CarrierHz: hz,
+		KeyDown: time.Now().UTC().Add(time.Duration(leadSec) * time.Second).Truncate(time.Second),
+		MinSNR: p.MinSNR, TrimEdges: p.TrimEdges}
+	if p.MinSNR == 0 {
+		p.MinSNR, p.TrimEdges = 20, true
+	}
+	a.saveLocked()
+	a.src.Info("practice on %s, measuring from %s UTC", khzStr(hz), p.KeyDown.Format("15:04:05"))
+	return strings.TrimSpace(fmt.Sprintf("Practice on %s; measuring starts at %s UTC. %s", khzStr(hz), p.KeyDown.Format("15:04:05"), msg)), nil
+}
+
+// CancelPractice removes the practice schedule (its file is kept).
+func (a *App) CancelPractice() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.sess.Practice.KeyDown = time.Time{}
+	a.saveLocked()
 }
 
 type RunEdit struct {
@@ -1078,7 +1152,7 @@ func (a *App) FlexTune(dialHz float64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if dialHz < 1.7e6 || dialHz > 30e6 {
+	if dialHz < 500e3 || dialHz > 30e6 {
 		return "", fmt.Errorf("dial %.0f Hz is out of range", dialHz)
 	}
 	hz := int64(math.Round(dialHz))
@@ -1150,8 +1224,11 @@ func (a *App) onSliceFreq(letter string, hz int64) {
 	a.src.Debug("slice %s dial %s", letter, hzStr(float64(hz)))
 	// While a run's carrier is on, remember the dial for the cross-check.
 	now := time.Now().UTC()
+	runs := []*session.Run{&a.sess.Practice}
 	for i := range a.sess.Runs {
-		r := &a.sess.Runs[i]
+		runs = append(runs, &a.sess.Runs[i])
+	}
+	for _, r := range runs {
 		if !now.Before(r.KeyDown) && now.Before(r.KeyUp()) {
 			r.RadioDialHz = hz
 			a.saveLocked()
@@ -1181,7 +1258,7 @@ func (a *App) allSlotIDs() []string {
 	for _, r := range a.sess.Runs {
 		ids = append(ids, r.ID)
 	}
-	return append(ids, "cal_after")
+	return append(ids, "cal_after", "practice")
 }
 
 func (a *App) slotTitles(ids []string) []string {
@@ -1192,6 +1269,8 @@ func (a *App) slotTitles(ids []string) []string {
 			out = append(out, "Calibration before")
 		case "cal_after":
 			out = append(out, "Calibration after")
+		case "practice":
+			out = append(out, "Practice")
 		default:
 			if r := a.sess.Run(id); r != nil {
 				out = append(out, r.Title())

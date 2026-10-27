@@ -24,6 +24,7 @@ sits beside it.
    - [FMT Assistant](#fmt-assistant-1)
    - [FlexRadio control (optional)](#flexradio-control-optional)
 6. [Rehearse before test night](#rehearse-before-test-night)
+   - [Practice on an AM broadcast station](#practice-on-an-am-broadcast-station)
 7. [Test night, step by step](#test-night-step-by-step)
 8. [After the test: results and submitting](#after-the-test-results-and-submitting)
 9. [The screens explained](#the-screens-explained)
@@ -63,6 +64,8 @@ sits beside it.
   file used twice, a calibration file used as a run, readings from another run's
   time slot, calibration left switched on inside WSJT-X, drift between the before
   and after calibrations, and more. See [Checks and warnings](#checks-and-warnings-and-what-to-do-about-them).
+- **Practice tab.** It rehearses the full routine on your local AM broadcast station
+  (or WWV) any evening, with the same prompts, Capture and analysis.
 - **Results.** It shows the four answers, saves a full report (`FMT results.txt`)
   and has a Copy button.
 - **FlexRadio control (optional).** It finds your FlexRadio on the LAN and can set
@@ -210,22 +213,83 @@ DIGU offset is set.
 
 ## Rehearse before test night
 
-Practise the whole process once, ideally on a practice FMT (announced on the
-[fmt-nuts group](https://groups.io/g/fmt-nuts)), or like this:
+Practise the whole process at least once before the real test. Practice FMTs are
+announced on the [fmt-nuts group](https://groups.io/g/fmt-nuts), but you don't
+have to wait for one: the **Practice** tab lets you rehearse any evening on your
+local AM broadcast station (or on WWV).
 
-1. **New session…** called "Rehearsal".
-2. Run a WWV calibration (see step 1 of [Test night](#test-night-step-by-step))
-   and **Capture** it as *Calibration before*.
-3. Turn the calibration cycle **off**, leave **Measure on**, and tune WWV 5 MHz with
+### Practice on an AM broadcast station
+
+An AM broadcast station is an ideal practice target. It's strong day and night,
+it's a steady carrier like the FMT key-down, and it sits on a round frequency: a
+multiple of 10 kHz in the Americas (for example 1010 kHz), or 9 kHz in most other
+regions. The Practice tab runs a one-minute "key-down" whenever you like, with
+the same voice prompts, Capture and analysis as test night.
+
+**What you need:** a receiver that covers the AM broadcast band (most HF
+transceivers do, and so do all FlexRadio 6000 models), plus any antenna. The
+signal is usually very strong. The app accepts frequencies from 500 kHz to 30 MHz.
+
+**Steps:**
+
+1. Optional but recommended: run a WWV calibration first and **Capture** it as
+   *Calibration before* on the Test night tab, so the practice answer is corrected
+   for your radio's error. Without a calibration, the practice answer is simply
+   dial + fMeas, uncorrected, and the app says so.
+2. Open the **Practice** tab.
+3. Type the station's frequency in **kHz**, for example `1010`. (For WWV, use the
+   **WWV 5 / 10 / 15** buttons.)
+4. Choose **Start measuring in** (1, 2 or 5 minutes; that's your call-up time).
+   Leave **Start a fresh fmt.all** ticked so the file holds only this practice.
+5. Press **Start practice**. The app says the dial to set and counts down. The
+   banner and the **Next** countdown work exactly as on test night.
+6. In WSJT-X: **Mode > FreqCal**, calibration cycle **off**, **Measure** on. Set
+   **USB** (DIGU on a Flex) to the **Set dial to** value, for example
+   **1,008.500 kHz** for a 1010 kHz station. Flex users can press **Set radio**.
+7. Look at the WSJT-X waterfall. The carrier should be a strong steady line near
+   1500 Hz, with the programme audio spread out above it. If the carrier isn't
+   near 1500 Hz, press **Tone is at…** and retune to the new dial.
+8. Type the exact dial into **Dial you used** (or press **From radio**), then keep
+   your hands off the dial.
+9. At one minute to go, 30 seconds, the 5-second countdown and "key down", the
+   prompts are the same as on test night. Let WSJT-X measure for the whole minute.
+10. When the voice says the minute is over, press **Capture**.
+11. Read the **Result**: mean fMeas, correction, the carrier frequency, and
+    **vs nominal**, how far it is from the station's published frequency. The
+    readings chart and table appear below, just like on the Run analysis tab. Only
+    the readings inside the measuring minute are used, and the first and last
+    are dropped.
+12. Press **Restart practice** to go again. The previous practice file is kept,
+    renamed, in the session folder.
+
+**How to judge the result:**
+
+- **AM broadcast stations aren't frequency standards.** Many are within a hertz or
+  two of nominal, and some are GPS-locked, but the legal tolerance is ±20 Hz.
+  VA3MW measured local carriers at +1.8, +0.8 and −0.5 Hz. A steady offset that
+  repeats night after night belongs to the station, not to you. What you're
+  practising is the routine, and steady readings (SD of a few tenths of a hertz).
+- **WWV is exact**, so a calibrated radio should land within about 0.3 Hz. If you
+  calibrated on the same WWV frequency you practise on, the check is circular and
+  will look perfect; practise on a different WWV frequency.
+- **Never use an AM station in your real calibration.** That's why the Calibration
+  tab leaves stations that aren't WWV out unless you deliberately include them.
+
+Practice results never appear on the Results tab, in the report, or in the
+problem count.
+
+### Check that FreqCal follows a hand-set dial
+
+It's also worth proving once that FreqCal measures correctly at any dial you set
+by hand:
+
+1. Turn the calibration cycle **off**, leave **Measure** on, and tune WWV 5 MHz with
    the dial deliberately 50 Hz off, for example **4998.450 kHz** instead of 4998.500.
-4. Confirm WSJT-X reads fMeas near **1550 Hz**. That proves FreqCal measures properly
-   at a dial you set by hand.
-5. Treat it as Run 1: press **Capture** on Run 1 and type the dial (4998.450).
-   Expect an error saying the file was measured near 5000 kHz rather than the Run 1
-   station, and that it looks like a calibration file. That's the mistake checking
-   working. You'll still see the answer, which should be within a fraction of a
-   hertz of 5,000,000.00 Hz.
-6. Start a new session for the real test.
+2. Confirm WSJT-X reads fMeas near **1550 Hz**.
+
+You can do this on the Practice tab: press **WWV 5**, start a practice run, and
+set the dial to 4998.450 instead of the suggested 4998.500. The answer should
+still come out within a fraction of a hertz of 5,000,000.00 Hz.
 
 ## Test night, step by step
 
@@ -390,6 +454,15 @@ Choose a run with the buttons at the top.
 
 The four answers, the report, Copy, and Open session folder.
 
+### Practice tab
+
+This tab runs a one-minute practice measurement on any steady carrier: an AM
+broadcast station or WWV. It shows the station frequency, a lead time and a fresh
+fmt.all option, the dial to set (with Tone is at… and Set radio), the dial you used,
+and the result with its offset from nominal. Below that is the same readings chart
+and table as the Run analysis tab. See
+[Practice on an AM broadcast station](#practice-on-an-am-broadcast-station).
+
 ### Setup & radio tab
 
 Session, WSJT-X folder, voice and sound, schedule, and FlexRadio. See
@@ -430,6 +503,7 @@ messages are warnings worth a look. **Blue** messages are information.
 
 | File | Contents |
 |---|---|
+| `0_practice_<freq>kHz.all` | The latest practice run |
 | `1_calibration_before.all` | Calibration before the runs |
 | `2_run1_W8RKO40m.all` … `5_run4_K5CM80m.all` | The four runs (names follow your schedule) |
 | `6_calibration_after.all` | Calibration after the runs |
@@ -560,7 +634,9 @@ wails build -ldflags "-s -w"
 The program is written to `build\bin\FMTAssistant.exe`.
 
 For development, `wails dev` runs the app with a browser view at
-http://localhost:34115.
+http://localhost:34115. Set the environment variable `FMTASSISTANT_NO_LOCK=1` to
+run a development copy beside an installed one; without it, the second copy exits
+because only one copy may run at a time.
 
 ### Project layout
 
