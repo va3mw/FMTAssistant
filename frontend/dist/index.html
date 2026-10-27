@@ -566,7 +566,9 @@ function runDetail(rv){
 }
 
 function renderResults(){
-  let h=`<div class="card"><h2>Measurements to submit</h2><div class="hint">Enter these on the ARRL FMT data entry page. Only runs marked Ready have passed every check.</div>
+  let h=`<div class="card"><h2>Measurements to submit</h2><div class="hint">For each run, enter the <b>Carrier frequency</b> on the ARRL FMT data entry page; that is your answer.
+    Dial, Mean fMeas and Correction show how it was worked out (Carrier = Dial + Mean fMeas − Correction) and are not submitted.
+    Only runs marked <b>Ready</b> have passed every check; fix any others (Run analysis tab) before you submit them.</div>
     <table style="margin-top:10px"><tr><th>Run</th><th>Key-down</th><th class="n">Dial</th><th class="n">Mean fMeas</th><th class="n">Correction</th><th class="n">Carrier frequency</th><th>Status</th></tr>
     ${S.runs.map(rv=>`<tr><td>${esc(rv.title)}</td><td>${hhmm(rv.run.key_down)}Z</td><td class="n">${rv.run.dial_hz?fmtHz(rv.run.dial_hz):'-'}</td>
       <td class="n">${rv.result&&rv.result.n?rv.result.mean_fmeas.toFixed(3):'-'}</td><td class="n">${rv.corr_hz!=null?rv.corr_hz.toFixed(3):'-'}</td>
