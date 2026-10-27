@@ -254,7 +254,7 @@ function events(){
     ev.push({id:'p-kd'+tag, t:kd, run:p, label:'Practice measuring', say:'Practice key down. Measuring for one minute.', longbeep:true, note:true});
     ev.push({id:'p-30left'+tag, t:kd+30e3, run:p, label:'Practice: 30 s left', say:'Thirty seconds left.'});
     ev.push({id:'p-ku'+tag, t:kd+60e3, run:p, label:'Practice: capture', slot:'practice',
-      say:'Practice minute is over. Press Capture on the practice tab, and enter the dial you used.', longbeep:true});
+      say:'Practice minute is over. Import the file: press Capture on the practice tab, and enter the dial you used.', longbeep:true});
   }
   ev.push({id:'cala-start', t:lastUp+60e3, label:'Start after calibration', slot:'cal_after',
     say:'All runs are done. Start the after calibration on W W V, let it run several cycles, then capture it.', beep:true});
@@ -471,11 +471,11 @@ function renderSide(){
     ${issuesHTML(w.issues)}
   </div>`;
   h+=`<div class="card"><h2>Before each step</h2><ol class="steps">
-    <li>WSJT-X <b>Mode &gt; FreqCal</b>.</li>
-    <li><b>Measure</b> box checked (the step most people miss).</li>
-    <li>Calibration: <b>Tools &gt; Execute frequency calibration cycle</b> on.</li>
-    <li>Test runs: calibration cycle <b>off</b>, dial set by hand, then hands off.</li>
-    <li>Do <b>not</b> click Apply in Solve for calibration; this app applies it.</li>
+    <li>Every step: WSJT-X <b>Mode &gt; FreqCal</b> and the <b>Measure</b> box checked (the step most people miss).</li>
+    <li><b>Calibration</b> (before and after): also turn <b>Tools &gt; Execute frequency calibration cycle</b> on, so WSJT-X steps through the WWV/CHU list.
+    Do <b>not</b> click Apply in Solve for calibration; this app applies it.</li>
+    <li><b>Test runs</b>: calibration cycle <b>off</b>, only <b>Measure</b> on. The cycle would retune the radio away from the test station.
+    Set the dial by hand, then hands off.</li>
     <li>Press <b>Capture</b> after each step so every run gets its own file.</li></ol></div>`;
   put('side', h);
 }
@@ -592,7 +592,7 @@ function renderPractice(){
   if(!kd) state='<span class="status wait">Not started</span>';
   else if(now<kd) state=`<span class="status warn">Measuring starts in ${dur((kd-now)/1000)}</span>`;
   else if(now<kd+60e3) state=`<span class="status bad">Measuring · ${dur((kd+60e3-now)/1000)} left</span>`;
-  else state=pv.present? '<span class="status ok">Captured</span>' : '<span class="status warn">Minute over: press Capture</span>';
+  else state=pv.present? '<span class="status ok">Captured</span>' : '<span class="status warn">Minute over: import fmt.all</span>';
   const dev = pv.final_hz!=null ? pv.final_hz-r.nominal_khz*1000 : null;
   let h=`<div class="grid2"><div>
   <div class="card"><h2>Practice on an AM broadcast station</h2>
@@ -600,12 +600,15 @@ function renderPractice(){
     carrier sits on a round frequency (a multiple of 10 kHz in the Americas, 9 kHz elsewhere). That lets you rehearse the whole
     test-night routine whenever you like: set the dial, centre the tone, type the dial, measure for one minute, capture, and read the answer.</p>
     <ol class="steps">
+      <li>Delete the old <b>fmt.all</b> first (in WSJT-X, <b>File &gt; Open log directory</b>), so earlier readings can't mix in.
+      Ticking <b>Start a fresh fmt.all</b> does the same by renaming it, as long as Setup points at that folder.</li>
       <li>Type the station's frequency in kHz (for example 1010), or pick WWV.</li>
-      <li>Choose how long you need to get ready, then press <b>Start practice</b>. The app starts a fresh fmt.all and counts down to a one-minute
+      <li>Choose how long you need to get ready, then press <b>Start practice</b>. The app counts down to a one-minute
       measuring window with the same voice prompts as test night.</li>
       <li>In WSJT-X: <b>Mode &gt; FreqCal</b>, calibration cycle <b>off</b>, <b>Measure</b> on. Set <b>USB</b> (DIGU on a Flex) to the dial shown.</li>
       <li>Centre the tone near 1500 Hz (press <b>Tone is at…</b> if it isn't), type the exact dial, then keep your hands off the dial.</li>
-      <li>When the minute is over, press <b>Capture</b>. The answer, and how far it is from the station's nominal frequency, appear here.</li>
+      <li>When the minute is over, import the file yourself: press <b>Capture fmt.all</b>, or <b>Load file…</b> to pick fmt.all by hand.
+      Nothing is analysed until you do. The answer, and how far it is from the station's nominal frequency, then appear here.</li>
     </ol>
     <div class="hint">The radio must receive the AM broadcast band; most HF transceivers and all FlexRadio 6000 models do.
     Run a WWV calibration first (Test night tab) if you want the answer corrected for your radio's error. Without one, the practice answer is uncorrected.</div>

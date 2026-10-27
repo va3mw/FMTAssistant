@@ -236,30 +236,37 @@ signal is usually very strong. The app accepts frequencies from 500 kHz to 30 MH
    *Calibration before* on the Test night tab, so the practice answer is corrected
    for your radio's error. Without a calibration, the practice answer is simply
    dial + fMeas, uncorrected, and the app says so.
-2. Open the **Practice** tab.
-3. Type the station's frequency in **kHz**, for example `1010`. (For WWV, use the
+2. Delete the old **fmt.all** (in WSJT-X, **File > Open log directory**), so
+   readings from an earlier session can't mix in with this one. The **Start a
+   fresh fmt.all** box does the same by renaming the file, but only if **Setup &
+   radio** points at the folder WSJT-X is writing to; deleting it yourself is the
+   sure way.
+3. Open the **Practice** tab.
+4. Type the station's frequency in **kHz**, for example `1010`. (For WWV, use the
    **WWV 5 / 10 / 15** buttons.)
-4. Choose **Start measuring in** (1, 2 or 5 minutes; that's your call-up time).
-   Leave **Start a fresh fmt.all** ticked so the file holds only this practice.
-5. Press **Start practice**. The app says the dial to set and counts down. The
+5. Choose **Start measuring in** (1, 2 or 5 minutes; that's your call-up time).
+   Leave **Start a fresh fmt.all** ticked.
+6. Press **Start practice**. The app says the dial to set and counts down. The
    banner and the **Next** countdown work exactly as on test night.
-6. In WSJT-X: **Mode > FreqCal**, calibration cycle **off**, **Measure** on. Set
+7. In WSJT-X: **Mode > FreqCal**, calibration cycle **off**, **Measure** on. Set
    **USB** (DIGU on a Flex) to the **Set dial to** value, for example
    **1,008.500 kHz** for a 1010 kHz station. Flex users can press **Set radio**.
-7. Look at the WSJT-X waterfall. The carrier should be a strong steady line near
+8. Look at the WSJT-X waterfall. The carrier should be a strong steady line near
    1500 Hz, with the programme audio spread out above it. If the carrier isn't
    near 1500 Hz, press **Tone is at…** and retune to the new dial.
-8. Type the exact dial into **Dial you used** (or press **From radio**), then keep
+9. Type the exact dial into **Dial you used** (or press **From radio**), then keep
    your hands off the dial.
-9. At one minute to go, 30 seconds, the 5-second countdown and "key down", the
-   prompts are the same as on test night. Let WSJT-X measure for the whole minute.
-10. When the voice says the minute is over, press **Capture**.
-11. Read the **Result**: mean fMeas, correction, the carrier frequency, and
+10. At one minute to go, 30 seconds, the 5-second countdown and "key down", the
+    prompts are the same as on test night. Let WSJT-X measure for the whole minute.
+11. When the voice says the minute is over, import the file yourself. Press
+    **Capture fmt.all** to copy it from the WSJT-X folder, or **Load file…** to
+    pick fmt.all by hand. Nothing is analysed until you do.
+12. Read the **Result**: mean fMeas, correction, the carrier frequency, and
     **vs nominal**, how far it is from the station's published frequency. The
     readings chart and table appear below, just like on the Run analysis tab. Only
     the readings inside the measuring minute are used, and the first and last
     are dropped.
-12. Press **Restart practice** to go again. The previous practice file is kept,
+13. Press **Restart practice** to go again (delete fmt.all again first). The previous practice file is kept,
     renamed, in the session folder.
 
 **How to judge the result:**
