@@ -11,7 +11,7 @@
   },
   "info": {
     "productName": "FMT Assistant",
-    "productVersion": "0.2.3",
+    "productVersion": "0.2.4",
     "comments": "ARRL Frequency Measuring Test helper for WSJT-X FreqCal"
   }
 }
