@@ -16,7 +16,7 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-const version = "0.2.4"
+const version = "0.2.5"
 
 func main() {
 	cfg, _ := os.UserConfigDir()
