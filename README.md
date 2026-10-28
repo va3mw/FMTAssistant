@@ -74,8 +74,15 @@ sits beside it.
 
 ## What you need
 
+- **Just `FMTAssistant.exe`.** The whole program is that one file, with its screens
+  built in: there's no installer, no runtime and nothing else to copy. FlexRadio
+  control and the voice prompts need nothing extra either.
 - Windows 10 or 11 (64-bit). The app uses Microsoft Edge WebView2, which comes with
-  Windows 11 and is installed on almost every Windows 10 PC.
+  Windows 11 and is installed on almost every Windows 10 PC. If a PC doesn't have
+  it, Windows offers to install it the first time you run the app.
+- Windows SmartScreen may warn the first time you run it, because the exe isn't
+  code-signed: click **More info**, then **Run anyway** (see
+  [Download and install](#download-and-install)).
 - An HF receiver with CAT control working in WSJT-X, and a working audio path into
   WSJT-X (sound card, USB codec or DAX).
 - **WSJT-X 2.x or later**, which includes FreqCal mode. Tested with WSJT-X 3.0.
