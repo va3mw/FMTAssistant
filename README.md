@@ -304,6 +304,20 @@ Have WSJT-X and FMT Assistant side by side. Keep the **Test night** tab open; th
 blue banner under the clock always says what to do now and offers the button
 you'll need.
 
+**Print the [operator checklist](https://va3mw.github.io/FMTAssistant/checklist.html)**
+(two pages: before the night, and minute by minute on the night, with a table to
+write each dial down as a paper backup).
+
+**Record the audio.** Recording the receiver audio for the whole evening lets you
+go back to it later. WSJT-X can't do this for you: in FreqCal mode it writes only
+`fmt.all` and doesn't save `.wav` files, even with **Save > Save all** on. Use a
+separate recorder such as Audacity on the same audio input WSJT-X uses (DAX on a
+Flex), start it before the calibration, and keep the file with your session folder.
+
+**Every file is kept.** Each Capture or Load also saves a dated copy in the
+session's `Archive` folder that is never overwritten (see
+[Files and folders](#files-and-folders)).
+
 ### 1. Calibration before (about 0209Z, 20 minutes before the first run)
 
 The voice says *"Twenty minutes to the first run. Start the before calibration…"*
@@ -478,6 +492,7 @@ Session, WSJT-X folder, voice and sound, schedule, and FlexRadio. See
 ### About tab
 
 The version, author and license, and links to the
+[printable operator checklist](https://va3mw.github.io/FMTAssistant/checklist.html), the
 [ARRL FMT page](https://fmt.arrl.org/), the
 [FMT data entry page](https://fmt.arrl.org/fmtentry.php), the fmt-nuts group,
 these instructions, the latest release, and the issue tracker. Links open in your
@@ -527,6 +542,7 @@ messages are warnings worth a look. **Blue** messages are information.
 | `session.json` | Your schedule, dial entries, choices and settings |
 | `FMT results.txt` | The report, written when you press Save report |
 | `*-replaced-*.all`, `*-removed-*.all` | Earlier files kept when you replace or remove one |
+| `Archive\<UTC time>_<file>.all` | A dated copy of every file captured or loaded, for example `Archive\20261113-023612Z_2_run1_W8RKO40m.all`. These are never overwritten or renamed, so the original readings of each step are always kept. |
 
 **WSJT-X log folder:** each Capture renames `fmt.all` to
 `fmt-<slot>-<UTC time>.bak`, for example `fmt-run1-20261113-023610.bak`, so

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FMT Operator Checklist</title>
+<meta name="description" content="A printable test-night checklist and operator flow for the ARRL Frequency Measuring Test with WSJT-X FreqCal and FMT Assistant.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root { --ink: #111; --dim: #555; --line: #bbb; --soft: #f2f4f7; --accent: #1d5fd1; }
+* { box-sizing: border-box; }
+html { background: #e6e9ee; }
+body {
+  margin: 0; color: var(--ink); background: #e6e9ee;
+  font: 13px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+.sheet {
+  background: #fff; max-width: 8.5in; margin: 24px auto; padding: 0.55in 0.6in;
+  box-shadow: 0 2px 12px #0002;
+}
+.toolbar { max-width: 8.5in; margin: 16px auto 0; display: flex; gap: 10px; align-items: center; padding: 0 16px; }
+.toolbar button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid #1d5fd1; background: #1d5fd1; color: #fff; cursor: pointer; }
+.toolbar a { color: var(--accent); }
+h1 { font-size: 22px; margin: 0; }
+h2 { font-size: 15px; margin: 18px 0 6px; padding-bottom: 3px; border-bottom: 2px solid var(--ink); }
+h3 { font-size: 13px; margin: 12px 0 4px; }
+.sub { color: var(--dim); margin: 2px 0 0; }
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+.fill { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 6px 10px; margin-top: 10px; align-items: end; }
+.fill span { border-bottom: 1px solid var(--ink); min-height: 18px; }
+ul.ck { list-style: none; padding: 0; margin: 4px 0; }
+ul.ck li { position: relative; padding: 2px 0 2px 24px; }
+ul.ck li::before {
+  content: ""; position: absolute; left: 2px; top: 5px; width: 12px; height: 12px;
+  border: 1.5px solid var(--ink); border-radius: 2px;
+}
+table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+th, td { border: 1px solid var(--line); padding: 4px 6px; text-align: left; vertical-align: top; }
+th { background: var(--soft); font-weight: 600; }
+td.t { white-space: nowrap; font-family: "Cascadia Mono", Consolas, monospace; font-weight: 600; }
+td.box { width: 22px; }
+td.box::before { content: ""; display: inline-block; width: 12px; height: 12px; border: 1.5px solid var(--ink); border-radius: 2px; }
+td.w { min-width: 90px; }
+tr.run td { background: #eef3fc; font-weight: 600; }
+.mono { font-family: "Cascadia Mono", Consolas, monospace; }
+.note { border-left: 3px solid var(--accent); background: var(--soft); padding: 6px 10px; margin: 8px 0; }
+.warn { border-left-color: #c77700; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+.foot { color: var(--dim); font-size: 11px; margin-top: 14px; }
+.pb { break-before: page; }
+@media (max-width: 700px) {
+  .sheet { padding: 20px 16px; margin: 12px 0; }
+  .cols { grid-template-columns: 1fr; }
+  .fill { grid-template-columns: auto 1fr; }
+  table { font-size: 12px; }
+}
+@media print {
+  @page { size: letter; margin: 0.45in; }
+  html, body { background: #fff; font-size: 12.5px; }
+  th, td { padding: 3px 6px; }
+  h2 { margin-top: 14px; }
+  .toolbar { display: none; }
+  .sheet { box-shadow: none; margin: 0; padding: 0; max-width: none; }
+  .pb { margin-top: 0; }
+  tr, li, .note { break-inside: avoid; }
+  th, tr.run td, .note { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <button onclick="window.print()">Print</button>
+  <a href="./">FMT Assistant home</a>
+  <a href="https://github.com/va3mw/FMTAssistant#readme">Full instructions</a>
+</div>
+
+<div class="sheet">
+
+<div class="head">
+  <div>
+    <h1>ARRL FMT: operator checklist</h1>
+    <p class="sub">WSJT-X FreqCal + FMT Assistant · November 13, 2026 UTC (evening of November 12 in North America)</p>
+  </div>
+  <div class="sub" style="text-align:right;white-space:nowrap">Page 1: before the night<br>Page 2: on the night</div>
+</div>
+<div class="fill">
+  <b>Call</b><span></span><b>Radio</b><span></span>
+  <b>Antenna</b><span></span><b>UTC offset</b><span></span>
+</div>
+
+<h2>Days before</h2>
+<div class="cols">
+<div>
+<h3>Software</h3>
+<ul class="ck">
+  <li>Latest FMT Assistant downloaded and opened once.</li>
+  <li>Schedule checked against the <b>ARRL FMT page</b> (fmt.arrl.org) and the fmt-nuts group; any change entered in <b>Setup &amp; radio</b>.</li>
+  <li>WSJT-X <b>Settings &gt; Frequencies</b>: calibration <b>intercept 0</b> and <b>slope 0 ppm</b>. FMT Assistant applies the correction itself.</li>
+  <li>WSJT-X FreqCal frequency list has the WWV/CHU frequencies you can hear.</li>
+  <li><b>Setup &amp; radio</b>: WSJT-X log folder chosen (WSJT-X <b>File &gt; Open log directory</b>); the WSJT-X panel shows no errors.</li>
+  <li>Voice prompts tested (<b>Test</b> button), volume set.</li>
+  <li>Windows clock synchronised (<b>Settings &gt; Time &gt; Sync now</b>).</li>
+  <li>FlexRadio users (optional): radio found, slice chosen, <b>Set radio</b> tested.</li>
+</ul>
+</div>
+<div>
+<h3>Rehearse</h3>
+<ul class="ck">
+  <li>At least one full practice run on the <b>Practice</b> tab (a local AM station or WWV).</li>
+  <li>Practice includes: delete the old fmt.all, set the dial, centre the tone near 1500 Hz, type the exact dial, measure, <b>Capture</b>, read the answer.</li>
+  <li>Readings steady: SD a few tenths of a hertz.</li>
+</ul>
+<h3>Audio recording (recommended)</h3>
+<ul class="ck">
+  <li>A separate recorder is set up to record the receiver audio for the whole evening, for example Audacity recording the same input WSJT-X uses (DAX on a Flex).</li>
+  <li>Test recording made and played back.</li>
+</ul>
+<div class="note warn"><b>WSJT-X won't record it for you.</b> In FreqCal mode WSJT-X writes only fmt.all; it does not save .wav files, even with <b>Save &gt; Save all</b> on. Use another program if you want the audio.</div>
+</div>
+</div>
+
+<h2>On the night, before 02:09 UTC</h2>
+<div class="cols">
+<ul class="ck">
+  <li>Radio on and warmed up (an hour or more is best); don't change radio settings from here to the end.</li>
+  <li>WSJT-X and FMT Assistant open; <b>Test night</b> tab showing; voice on.</li>
+  <li>Problems pill reads <b>No problems</b> (or each one understood).</li>
+  <li>Old <b>fmt.all</b> deleted (WSJT-X <b>File &gt; Open log directory</b>), so earlier readings can't mix in.</li>
+</ul>
+<ul class="ck">
+  <li>Audio recorder started, with enough disk space for about 90 minutes.</li>
+  <li>Receive mode <b>USB</b> (DIGU on a Flex), RIT off, no DIGU offset.</li>
+  <li>Pen and this sheet ready to write each dial down as a backup.</li>
+  <li>Phone or other noise sources away from the radio.</li>
+</ul>
+</div>
+
+<div class="note">Every <b>Capture</b> copies fmt.all into the session folder and also saves a dated copy in the session's <b>Archive</b> folder, for example <span class="mono">Archive\20261113-023612Z_2_run1_W8RKO40m.all</span>. Archive copies are never overwritten, so every file processed on the night is kept. <b>Open session folder</b> on the Results tab shows them.</div>
+
+<p class="foot">Times are the November 13, 2026 schedule built into FMT Assistant. Confirm them on the ARRL FMT page before the night. Nominal frequencies are approximate: listen to each call-up and use <b>Tone is at…</b> if the tone isn't near 1500 Hz.</p>
+
+<!-- ------------------------------------------------------------------ page 2 -->
+<div class="pb"></div>
+<h2 style="margin-top:0">Test night, minute by minute</h2>
+<p class="sub" style="margin-bottom:6px">FMT Assistant speaks each step. Tick each box as you go. Write your local time in the Local column.</p>
+<table>
+<thead><tr><th>UTC</th><th>Local</th><th>Do this</th><th></th></tr></thead>
+<tbody>
+<tr class="run"><td class="t">02:09</td><td class="w"></td><td colspan="2">Calibration before (WWV)</td></tr>
+<tr><td class="t">02:09</td><td></td><td>WSJT-X <b>Mode &gt; FreqCal</b>, <b>Measure</b> on, <b>Tools &gt; Execute frequency calibration cycle</b> on. Let it run several cycles.</td><td class="box"></td></tr>
+<tr><td class="t">02:25</td><td></td><td>Calibration cycle <b>off</b>. Press <b>Capture</b> for <i>Calibration before</i>. Check the Calibration tab. Do <b>not</b> click Apply in Solve.</td><td class="box"></td></tr>
+</tbody>
+</table>
+
+<table>
+<thead><tr><th>Run</th><th>Call-up</th><th>Key-down</th><th>Station</th><th>Nominal</th><th>Dial to set (USB)</th></tr></thead>
+<tbody>
+<tr><td>1</td><td class="t">02:29</td><td class="t">02:34</td><td>W8RKO 40 m</td><td class="mono">7064 kHz</td><td class="mono">7062.500 kHz</td></tr>
+<tr><td>2</td><td class="t">02:44</td><td class="t">02:49</td><td>K5CM 40 m</td><td class="mono">7065 kHz</td><td class="mono">7063.500 kHz</td></tr>
+<tr><td>3</td><td class="t">02:59</td><td class="t">03:04</td><td>W8RKO 80 m</td><td class="mono">3598 kHz</td><td class="mono">3596.500 kHz</td></tr>
+<tr><td>4</td><td class="t">03:14</td><td class="t">03:19</td><td>K5CM 80 m</td><td class="mono">3599 kHz</td><td class="mono">3597.500 kHz</td></tr>
+</tbody>
+</table>
+
+<h3>For each run (repeat four times)</h3>
+<table>
+<thead><tr><th>When</th><th>Do this</th><th>1</th><th>2</th><th>3</th><th>4</th></tr></thead>
+<tbody>
+<tr><td class="t">Call-up −5:00</td><td>Calibration cycle <b>off</b>, only <b>Measure</b> on. Set the USB dial (Flex: <b>Set radio</b>).</td><td class="box"></td><td class="box"></td><td class="box"></td><td class="box"></td></tr>
+<tr><td class="t">−2:00</td><td>Carrier near <b>1500 Hz</b> on the waterfall? If not, <b>Tone is at…</b> and retune. Type the <b>exact dial</b> into the app and write it below.</td><td class="box"></td><td class="box"></td><td class="box"></td><td class="box"></td></tr>
+<tr><td class="t">−0:30</td><td><b>Hands off the dial.</b></td><td class="box"></td><td class="box"></td><td class="box"></td><td class="box"></td></tr>
+<tr><td class="t">Key-down</td><td>One minute of carrier. Let WSJT-X measure the whole minute.</td><td class="box"></td><td class="box"></td><td class="box"></td><td class="box"></td></tr>
+<tr><td class="t">+1:00</td><td>Press <b>Capture</b> for this run (a dated copy goes to Archive). Check the dial entry, and that the run shows <b>Ready</b>.</td><td class="box"></td><td class="box"></td><td class="box"></td><td class="box"></td></tr>
+</tbody>
+</table>
+
+<table>
+<tbody>
+<tr class="run"><td class="t">03:21</td><td class="w"></td><td colspan="2">Calibration after (WWV)</td></tr>
+<tr><td class="t">03:21</td><td></td><td>Back to WWV: <b>Measure</b> on, calibration cycle <b>on</b>. Several cycles, then cycle off and <b>Capture</b> for <i>Calibration after</i>.</td><td class="box"></td></tr>
+<tr><td class="t">After</td><td></td><td>Stop the audio recorder and save the recording with the date and your call in its name.</td><td class="box"></td></tr>
+<tr><td class="t">After</td><td></td><td><b>Results</b> tab: every run <b>Ready</b>. <b>Save report &amp; show</b>.</td><td class="box"></td></tr>
+<tr><td class="t">After</td><td></td><td>Enter each run's <b>Carrier frequency</b> on the ARRL FMT data entry page (fmt.arrl.org/fmtentry.php).</td><td class="box"></td></tr>
+<tr><td class="t">After</td><td></td><td>Back up the session folder (with its <b>Archive</b> folder) and the audio recording.</td><td class="box"></td></tr>
+</tbody>
+</table>
+
+<h3>Paper backup</h3>
+<table>
+<thead><tr><th>Run</th><th>Station</th><th>Exact dial used</th><th>Mean fMeas</th><th>Carrier frequency submitted</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>W8RKO 40 m</td><td></td><td></td><td></td></tr>
+<tr><td>2</td><td>K5CM 40 m</td><td></td><td></td><td></td></tr>
+<tr><td>3</td><td>W8RKO 80 m</td><td></td><td></td><td></td></tr>
+<tr><td>4</td><td>K5CM 80 m</td><td></td><td></td><td></td></tr>
+</tbody>
+</table>
+
+<p class="foot">FMT Assistant · va3mw.github.io/FMTAssistant · MIT license, © 2026 Michael VA3MW. Carrier = Dial + Mean fMeas − Correction. The Carrier frequency is the number you submit.</p>
+</div>
+</body>
+</html>

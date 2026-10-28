@@ -593,7 +593,7 @@ func (a *App) CaptureSlot(id string, force bool) (string, error) {
 		return fmt.Sprintf("Captured %d readings, but fmt.all could not be cleared (%v). Rename it by hand before the next run.", len(f.Lines), err), nil
 	}
 	a.src.Info("captured %s (%d readings); fmt.all moved to %s", id, len(f.Lines), filepath.Base(bak))
-	return fmt.Sprintf("Captured %d readings. fmt.all was moved to %s so the next run starts clean.", len(f.Lines), filepath.Base(bak)), nil
+	return fmt.Sprintf("Captured %d readings (a dated copy is in the session's Archive folder). fmt.all was moved to %s so the next run starts clean.", len(f.Lines), filepath.Base(bak)), nil
 }
 
 // LoadSlot asks for a saved file and copies it into a slot.
@@ -639,7 +639,7 @@ func (a *App) LoadSlot(id string) (string, error) {
 	if err := a.storeLocked(id, sl, p); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("Loaded %d readings from %s.", len(f.Lines), filepath.Base(p)), nil
+	return fmt.Sprintf("Loaded %d readings from %s (a dated copy is in the session's Archive folder).", len(f.Lines), filepath.Base(p)), nil
 }
 
 func (a *App) storeLocked(id string, sl *session.Slot, src string) error {
@@ -656,6 +656,19 @@ func (a *App) storeLocked(id string, sl *session.Slot, src string) error {
 	}
 	if err := copyFile(src, dst); err != nil {
 		return err
+	}
+	// Keep a never-overwritten copy of every file processed, named by the UTC
+	// time it came in, so the original readings survive re-captures and edits.
+	arch := filepath.Join(a.sess.Dir(), "Archive")
+	if err := os.MkdirAll(arch, 0o755); err == nil {
+		an := time.Now().UTC().Format("20060102-150405Z") + "_" + name
+		if err := copyFile(src, filepath.Join(arch, an)); err != nil {
+			a.src.Warn("could not archive %s: %v", name, err)
+		} else {
+			a.src.Info("archived %s as Archive\\%s", filepath.Base(src), an)
+		}
+	} else {
+		a.src.Warn("could not create the archive folder: %v", err)
 	}
 	*sl = session.Slot{File: name, Source: src, CapturedAt: time.Now().UTC().Format(time.RFC3339)}
 	if r := a.sess.Run(id); r != nil {
