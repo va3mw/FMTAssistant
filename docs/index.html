@@ -173,6 +173,7 @@ footer img { width: 28px; vertical-align: middle; margin-right: 6px; border-radi
       <div class="card" style="--c: var(--blue)"><h3><b>⤓</b>One-click capture</h3><p><b>Capture</b> copies WSJT-X's <code>fmt.all</code> into the right slot (calibration before, four runs, calibration after) and starts a clean file for the next step. Runs can't get mixed together.</p></div>
       <div class="card" style="--c: var(--on)"><h3><b>∑</b>WSJT-X-compatible maths</h3><p>The same straight-line calibration fit WSJT-X uses. Weak readings (the <code>*</code> lines) and stations other than WWV are dropped. Each key-down carrier is found automatically, with CW ID and the edges left out.</p></div>
       <div class="card" style="--c: var(--bad)"><h3><b>!</b>Mistake checks</h3><p>Dial typos, the wrong file in a slot, a file used twice, WSJT-X's own calibration left on, readings from another run, drift between calibrations. Every result says <b>Ready</b> only when it has passed them all.</p></div>
+      <div class="card" style="--c: var(--sky)"><h3><b>∿</b>Live readings and stability chart</h3><p>While a step is on, the app follows <code>fmt.all</code> second by second: good readings, mean, σ, drift, the uncertainty of the mean and a live carrier estimate, with a chart of every reading against the key-down minute. It only reads the file; the answer still comes from Capture.</p></div>
       <div class="card" style="--c: var(--violet)"><h3><b>↺</b>Practise any evening</h3><p>The <b>Practice</b> tab runs the full routine on your local AM broadcast station or WWV whenever you like, with the same prompts, capture and analysis as test night.</p></div>
     </div>
   </div>
@@ -229,7 +230,9 @@ footer img { width: 28px; vertical-align: middle; margin-right: 6px; border-radi
         <tr><td>Dial typo</td><td>WSJT-X logs the station's kHz, so only a 1 kHz range of dials is possible. Typing 7062.152 instead of 7062.512 is flagged at once.</td></tr>
         <tr><td>Wrong file</td><td>A run measured on another station, a calibration file in a run slot (or the reverse), or one file used in two slots.</td></tr>
         <tr><td>Forgot to capture</td><td>Readings that fall in another run's time slot, or a carrier found outside the scheduled key-down.</td></tr>
-        <tr><td>Measure unchecked</td><td>The live <code>fmt.all</code> panel shows whether WSJT-X is writing. An empty file is refused at Capture.</td></tr>
+        <tr><td>Measure unchecked</td><td>The live <code>fmt.all</code> panel shows whether WSJT-X is writing, and a warning appears if no readings arrive for 20 seconds. An empty file is refused at Capture.</td></tr>
+        <tr><td>Dial off, or the wrong station</td><td>While you measure, a live warning appears if the tone is far from 1500 Hz, early enough to retune before key-down.</td></tr>
+        <tr><td>Calibration cycle left on, or QRM</td><td>Live warnings for readings from more than one frequency, sudden jumps, or readings that split into two groups.</td></tr>
         <tr><td>WSJT-X calibration left on</td><td>The app reads WSJT-X's settings. A non-zero intercept or slope moves the radio away from the dial WSJT-X shows.</td></tr>
         <tr><td>Bad calibration station</td><td>Weak (<code>*</code>) readings, AM broadcasters and wild values are left out. A large StdDev points at the odd one out.</td></tr>
         <tr><td>Radio drifted</td><td>Before and after calibrations that disagree by more than 0.3 Hz trigger a warning; averaging them is the default.</td></tr>
