@@ -16,11 +16,10 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-const version = "0.2.5"
+const version = "0.3.0"
 
 func main() {
-	cfg, _ := os.UserConfigDir()
-	l := logx.New(filepath.Join(cfg, "FMTAssistant", "logs"))
+	l := logx.New(filepath.Join(appDataDir(), "logs"))
 	l.Log(logx.Info, "app", "FMT Assistant %s starting", version)
 
 	app := NewApp(l)

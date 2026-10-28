@@ -81,6 +81,9 @@ type Session struct {
 	Volume  int    `json:"volume"`
 	Beeps   bool   `json:"beeps"`
 	Flex    Flex   `json:"flex"`
+	// AutoCapture captures fmt.all one minute after each key-up when the
+	// slot is still empty. Off by default.
+	AutoCapture bool `json:"auto_capture"`
 
 	dir string
 }
@@ -232,6 +235,9 @@ func DefaultDir(name string) string {
 // Windows Security's "Controlled folder access" blocks unknown programs from
 // writing to Documents, and reports it as "file not found".
 func SessionsRoot() (root string, fallback bool) {
+	if h := Home(); h != "" {
+		return filepath.Join(h, "Sessions"), false
+	}
 	docs := filepath.Join(DocumentsDir(), "FMT Assistant")
 	if Writable(docs) {
 		return docs, false
@@ -239,6 +245,11 @@ func SessionsRoot() (root string, fallback bool) {
 	h, _ := os.UserHomeDir()
 	return filepath.Join(h, "FMT Assistant"), true
 }
+
+// Home is FMTASSISTANT_HOME: when set (for development and testing), the
+// app keeps its settings, logs and sessions under it instead of %APPDATA%
+// and Documents.
+func Home() string { return os.Getenv("FMTASSISTANT_HOME") }
 
 // Writable creates dir if needed and checks a file can be written in it.
 func Writable(dir string) bool {

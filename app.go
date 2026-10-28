@@ -41,6 +41,10 @@ type App struct {
 	radio *flex.Radio
 	// dial history of the controlled slice, to check the dial during a carrier
 	freqLog []freqEntry
+
+	// live follow of fmt.all (live.go); liveMu is taken before mu, never after
+	liveMu sync.Mutex
+	live   *liveFollow
 }
 
 type cached struct {
@@ -102,6 +106,7 @@ func (a *App) startup(ctx context.Context) {
 }
 
 func (a *App) shutdown(context.Context) {
+	a.LiveFollow("")
 	a.radio.Disconnect()
 	a.disc.Stop()
 	a.log.Close()
@@ -925,6 +930,14 @@ func (a *App) SetCallsign(c string) {
 	a.saveLocked()
 }
 
+// SetAutoCapture turns automatic capture one minute after key-up on or off.
+func (a *App) SetAutoCapture(on bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.sess.AutoCapture = on
+	a.saveLocked()
+}
+
 func (a *App) SetVoice(on bool, volume int, beeps bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -978,6 +991,7 @@ func (a *App) NewSession(name string) (string, error) {
 	s := session.Default()
 	s.Name, s.Callsign, s.WSJTXDir, s.Flex = name, old.Callsign, old.WSJTXDir, old.Flex
 	s.Voice, s.Volume, s.Beeps, s.CalMode = old.Voice, old.Volume, old.Beeps, old.CalMode
+	s.AutoCapture = old.AutoCapture
 	// Keep the schedule the operator may have edited.
 	for i := range s.Runs {
 		if i < len(old.Runs) {
@@ -1397,8 +1411,17 @@ func copyFile(src, dst string) error {
 // app config: remembers the last session folder
 
 func configPath() string {
+	return filepath.Join(appDataDir(), "config.json")
+}
+
+// appDataDir is %APPDATA%\FMTAssistant, or <FMTASSISTANT_HOME>\AppData for a
+// development copy kept apart from the real settings and sessions.
+func appDataDir() string {
+	if h := session.Home(); h != "" {
+		return filepath.Join(h, "AppData")
+	}
 	d, _ := os.UserConfigDir()
-	return filepath.Join(d, "FMTAssistant", "config.json")
+	return filepath.Join(d, "FMTAssistant")
 }
 
 func loadLastDir() string {

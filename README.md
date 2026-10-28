@@ -28,6 +28,7 @@ sits beside it.
 7. [Test night, step by step](#test-night-step-by-step)
 8. [After the test: results and submitting](#after-the-test-results-and-submitting)
 9. [The screens explained](#the-screens-explained)
+   - [Live readings and the stability chart](#live-readings-and-the-stability-chart)
 10. [Checks and warnings, and what to do about them](#checks-and-warnings-and-what-to-do-about-them)
 11. [Files and folders](#files-and-folders)
 12. [Using files you already have](#using-files-you-already-have)
@@ -66,6 +67,12 @@ sits beside it.
   and after calibrations, and more. See [Checks and warnings](#checks-and-warnings-and-what-to-do-about-them).
 - **Practice tab.** It rehearses the full routine on your local AM broadcast station
   (or WWV) any evening, with the same prompts, Capture and analysis.
+- **Live readings and stability chart.** While a step is on, it follows WSJT-X's
+  `fmt.all` second by second and shows the number of good readings, the running
+  mean, σ, drift, the uncertainty of the mean and a live carrier estimate, with a
+  chart of every reading. It warns at once if readings stop, the tone is far from
+  1500 Hz, or the readings jump. This is a preview; the answer still comes from
+  Capture. See [Live readings and the stability chart](#live-readings-and-the-stability-chart).
 - **Results.** It shows the four answers, saves a full report (`FMT results.txt`)
   and has a Copy button.
 - **FlexRadio control (optional).** It finds your FlexRadio on the LAN and can set
@@ -468,8 +475,9 @@ Choose a run with the buttons at the top.
 - **Carrier found**: the stretch of readings taken as the key-down carrier.
 - **Mean fMeas**, **SD / SEM** (scatter, and the uncertainty of the mean), **Dial must
   be in** (the range of dials consistent with what WSJT-X logged), and the **Carrier** answer.
-- **Chart**: every reading in time order. Green dots were used; amber ones were
-  strong but not part of the carrier; grey ones were weak.
+- **Chart**: the stability chart of every reading in the file (see
+  [Live readings and the stability chart](#live-readings-and-the-stability-chart)).
+  Filled dots were used; hollow ones were strong but left out; faded ones were weak.
 - **Readings table**: every line of the file with the reason it was used or not
   (*used*, *weak signal*, *not part of the carrier*, *outside key-down time*,
   *edge of carrier*, *outlier*). Use **use / auto / drop** to override any line, and
@@ -480,7 +488,71 @@ Choose a run with the buttons at the top.
 
 ### Results tab
 
-The four answers, the report, Copy, and Open session folder.
+The four answers, the report, Copy, and Open session folder. Below them, a small
+stability chart for each captured run shows how steady its readings were.
+
+### Live readings and the stability chart
+
+While a step is on, FMT Assistant reads the new lines WSJT-X adds to `fmt.all`
+about once a second and shows them as they arrive. It only reads the file: it never
+writes to it, locks it or deletes it, so WSJT-X and Capture work exactly as before.
+If the file shrinks, is renamed (Capture, **Start a fresh fmt.all**) or disappears,
+the live view simply starts over with the new file.
+
+**When it follows the file.** During the before calibration (from 20 minutes before
+the first call-up until you capture it), each run from call-up until it is captured,
+the after calibration, and a practice run. **Watch live** on the Calibration and
+Practice tabs starts it at any other time, for example to look at WWV or CHU.
+
+**The live numbers** (in a dashed box marked *Live preview*):
+
+| Number | Meaning |
+|---|---|
+| Good readings | Readings at or above the S/N limit (20 dB unless you changed it). During a run's key-down minute only the readings inside that minute count; before key-down, every strong reading so far counts (the CW ID too). |
+| Mean fMeas | The running average of those readings. |
+| σ | Their standard deviation: the scatter from one reading to the next. |
+| Drift | The slope of a straight line through them, in Hz per minute. |
+| σ/√N | The uncertainty of the mean. |
+| Live carrier | Dial + mean fMeas − the calibration-before correction, for example `7,064,000.12 Hz ± 0.04`. It uses the dial you typed, or the suggested dial until you type one. |
+
+**The live carrier is only a preview.** The answer you submit always comes from the
+file you capture, analysed exactly as before (edges trimmed, outliers rejected, and
+the calibration you chose on the Calibration tab).
+
+**The stability chart** shows each reading over time as an offset from the mean, in
+hertz. The scale adjusts itself; on a good night the readings stay within ±0.5 Hz.
+
+- Dots are coloured by S/N (amber 20-30 dB, teal 30-40 dB, blue 40 dB and up).
+  Readings below the S/N limit are faded and not used.
+- The solid line is the mean, and the blue band is ±1σ around it.
+- The thin green band is ±0.05 Hz, about the measurement noise of FreqCal. Readings
+  that wander well outside it are the path (HF Doppler is typically 0.1-0.5 Hz at
+  night), not your radio.
+- The red shaded strip is the scheduled key-down minute.
+- The bars on the right are a histogram of the readings in use.
+- On the Run analysis and Results tabs, hollow dots were strong but left out of the
+  answer (CW ID, the first and last carrier readings, outliers, or your choice).
+- Hover a dot to see its time, fMeas and S/N.
+
+On the **Calibration** tab, each station gets its own small chart showing each
+reading's DF minus the calibration fit (A + B·f) at that frequency. The dashed line is
+the fit; the solid line shows how far the station sits from it, which is the
+*Residual* in the table. While a calibration is running, the fit is worked out live
+from the stations measured so far.
+
+**Live warnings:**
+
+| Warning | What it usually means |
+|---|---|
+| *No new readings for …* / *There is no fmt.all…* (after about 20 s) | Measure isn't checked in WSJT-X, the mode or dial is wrong, no audio reaches WSJT-X, or Setup points at the wrong WSJT-X folder. |
+| *The tone is at … Hz, … Hz from 1500 Hz* | The dial is off, or it's the wrong station. Use **Tone is at…** and retune before the last 30 seconds. |
+| *Recent readings come from more than one frequency* | The calibration cycle is still on in WSJT-X, or the last step wasn't captured. |
+| *Readings fall into two groups* / *sudden jump(s)* | The calibration cycle is switching, the dial was touched, or there's QRM. Check the WSJT-X waterfall. |
+| *(station) reads … Hz from the tone it should give* (calibration) | The dial is off, or WSJT-X has a calibration applied. |
+
+**Capture automatically** (Setup & radio, off by default) presses Capture for you one
+minute after each key-up, but only when that slot is still empty, so it never
+replaces a file. You still type the dial you used.
 
 ### Practice tab
 
@@ -691,14 +763,21 @@ The program is written to `build\bin\FMTAssistant.exe`.
 For development, `wails dev` runs the app with a browser view at
 http://localhost:34115. Set the environment variable `FMTASSISTANT_NO_LOCK=1` to
 run a development copy beside an installed one; without it, the second copy exits
-because only one copy may run at a time.
+because only one copy may run at a time. Set `FMTASSISTANT_HOME` to a scratch
+folder to keep the development copy's settings, logs and sessions there instead of
+in `%APPDATA%` and Documents, and point `LOCALAPPDATA` at a scratch folder too so
+it follows a test `WSJT-X\fmt.all` rather than the real one.
+
+The app switches to dark mode by itself when Windows is set to dark (Settings >
+Personalization > Colors).
 
 ### Project layout
 
 | Path | Contents |
 |---|---|
 | `main.go`, `app.go` | Window setup, and the methods the UI calls (state, capture, analysis, Flex, report) |
-| `internal/fmtdata` | `fmt.all` parser, calibration fit, run analysis, and tests |
+| `live.go` | Live follow of `fmt.all` and the `live` events sent to the UI |
+| `internal/fmtdata` | `fmt.all` parser, live follower, calibration fit, run analysis, and tests |
 | `internal/session` | The session (schedule, slots, settings), saved as `session.json` |
 | `internal/flex` | FlexRadio LAN discovery and SmartSDR API client (slice status, DIGU tune) |
 | `internal/speech` | Windows SAPI voice |

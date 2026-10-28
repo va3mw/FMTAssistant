@@ -6,23 +6,46 @@
 <title>FMT Assistant</title>
 <style>
 :root{
+  color-scheme:light;
   --bg:#f4f5f7; --panel:#fff; --ink:#1d2330; --muted:#5f6b7a; --line:#dde1e7;
   --accent:#1f6feb; --accent-ink:#fff; --ok:#1a7f37; --ok-bg:#e6f4ea; --warn:#9a6700; --warn-bg:#fff4d6;
   --err:#c62828; --err-bg:#fde7e7; --info:#3b5b8a; --info-bg:#eaf1fb; --hl:#fffbe6; --now:#e8f0fe;
+  --btn:#fff; --btn-hover:#f8f9fb; --btn-hover-line:#b9c1cc; --input:#fff; --input-line:#c5ccd6; --focus:#b6d0fb;
+  --now-line:#c9d8f5; --live-bg:#fff1d6; --live-line:#f0cf87; --carrier-bg:#ffe1e1; --carrier-line:#f2a3a3;
+  --ring:#cfe0fd; --chip:#eef0f3; --row-line:#eef0f3; --faint:#9aa4b2;
+  /* stability chart */
+  --c-bg:#fbfcfd; --c-grid:#e3e7ed; --c-axis:#5f6b7a; --c-mean:#1d2330; --c-sigma:rgba(31,111,235,.10);
+  --c-floor:rgba(26,127,55,.16); --c-kd:rgba(198,40,40,.07); --c-kd-line:rgba(198,40,40,.45); --c-fit:#8a94a3;
+  --c-hist:rgba(31,111,235,.35); --c-weak:#b7c0cc; --c-snr1:#e0a020; --c-snr2:#2b8a8a; --c-snr3:#1f4fd1;
   --mono: "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    color-scheme:dark;
+    --bg:#0f141b; --panel:#171d26; --ink:#e3e8ef; --muted:#97a3b3; --line:#2b3442;
+    --accent:#4c8dff; --accent-ink:#fff; --ok:#56c374; --ok-bg:#16301f; --warn:#e3b341; --warn-bg:#3a2f12;
+    --err:#ff7b72; --err-bg:#3d1a1a; --info:#9cbcf0; --info-bg:#18263b; --hl:#2f2a12; --now:#162238;
+    --btn:#1e2530; --btn-hover:#252d3a; --btn-hover-line:#3d4859; --input:#11161d; --input-line:#3a4555; --focus:#2d4f86;
+    --now-line:#25395c; --live-bg:#3a2d0f; --live-line:#6b5217; --carrier-bg:#401919; --carrier-line:#7a2e2e;
+    --ring:#23406e; --chip:#252d3a; --row-line:#222a35; --faint:#6b7685;
+    --c-bg:#11161d; --c-grid:#252e3a; --c-axis:#97a3b3; --c-mean:#e3e8ef; --c-sigma:rgba(76,141,255,.16);
+    --c-floor:rgba(86,195,116,.20); --c-kd:rgba(255,123,114,.09); --c-kd-line:rgba(255,123,114,.5); --c-fit:#7d8899;
+    --c-hist:rgba(76,141,255,.45); --c-weak:#4a5463; --c-snr1:#e3b341; --c-snr2:#3cc4c4; --c-snr3:#7aa7ff;
+  }
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
 body{background:var(--bg);color:var(--ink);font:14px/1.4 "Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column}
-button{font:inherit;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:6px;padding:5px 11px;cursor:pointer}
-button:hover{border-color:#b9c1cc;background:#f8f9fb}
+a{color:var(--accent)}
+button{font:inherit;border:1px solid var(--line);background:var(--btn);color:var(--ink);border-radius:6px;padding:5px 11px;cursor:pointer}
+button:hover{border-color:var(--btn-hover-line);background:var(--btn-hover)}
 button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 button.primary:hover{filter:brightness(1.07)}
 button.small{padding:2px 8px;font-size:12px}
 button:disabled{opacity:.45;cursor:default}
-input,select{font:inherit;border:1px solid #c5ccd6;border-radius:6px;padding:4px 7px;background:#fff;color:var(--ink)}
+input,select{font:inherit;border:1px solid var(--input-line);border-radius:6px;padding:4px 7px;background:var(--input);color:var(--ink)}
 input.num{font-family:var(--mono)}
-input:focus,select:focus{outline:2px solid #b6d0fb;border-color:var(--accent)}
+input:focus,select:focus{outline:2px solid var(--focus);border-color:var(--accent)}
 .mono{font-family:var(--mono)}
 .muted{color:var(--muted)}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -48,12 +71,12 @@ header .brand small{display:block;color:#93a1b5;font-weight:400}
 .pill.bad{background:#4a1a1a;color:#ffb3b3;border-color:#7a2a2a}
 
 /* now banner */
-#banner{padding:10px 18px;background:var(--now);border-bottom:1px solid #c9d8f5;display:flex;gap:14px;align-items:center}
+#banner{padding:10px 18px;background:var(--now);border-bottom:1px solid var(--now-line);display:flex;gap:14px;align-items:center}
 #banner .big{font-size:17px;font-weight:600}
-#banner.live{background:#fff1d6;border-color:#f0cf87}
-#banner.carrier{background:#ffe1e1;border-color:#f2a3a3}
+#banner.live{background:var(--live-bg);border-color:var(--live-line)}
+#banner.carrier{background:var(--carrier-bg);border-color:var(--carrier-line)}
 
-nav{display:flex;gap:2px;padding:0 18px;background:#fff;border-bottom:1px solid var(--line)}
+nav{display:flex;gap:2px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--line)}
 nav button{border:none;border-bottom:3px solid transparent;border-radius:0;padding:10px 14px;background:none;color:var(--muted);font-weight:600}
 nav button.on{color:var(--ink);border-bottom-color:var(--accent)}
 nav .badge{background:var(--err);color:#fff;border-radius:999px;font-size:11px;padding:0 6px;margin-left:5px}
@@ -63,7 +86,7 @@ main{flex:1;overflow:auto;padding:16px 18px 40px}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
 .card h2{margin:0 0 4px;font-size:16px}
 .card h3{margin:14px 0 6px;font-size:14px}
-.card.current{border-color:var(--accent);box-shadow:0 0 0 2px #cfe0fd}
+.card.current{border-color:var(--accent);box-shadow:0 0 0 2px var(--ring)}
 .card.done{border-left:5px solid var(--ok)}
 .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
 .grid2>*,.layout>*{min-width:0}
@@ -78,7 +101,7 @@ select{max-width:100%}
 .answer.ok{color:var(--ok)}
 .status{font-size:12px;font-weight:600;border-radius:5px;padding:2px 7px}
 .status.ok{background:var(--ok-bg);color:var(--ok)}
-.status.wait{background:#eef0f3;color:var(--muted)}
+.status.wait{background:var(--chip);color:var(--muted)}
 .status.bad{background:var(--err-bg);color:var(--err)}
 .status.warn{background:var(--warn-bg);color:var(--warn)}
 
@@ -90,15 +113,15 @@ select{max-width:100%}
 
 table{border-collapse:collapse;width:100%;font-size:13px}
 th{text-align:left;font-weight:600;color:var(--muted);border-bottom:1px solid var(--line);padding:4px 6px;white-space:nowrap}
-td{border-bottom:1px solid #eef0f3;padding:3px 6px;white-space:nowrap}
+td{border-bottom:1px solid var(--row-line);padding:3px 6px;white-space:nowrap}
 td.n,th.n{text-align:right;font-family:var(--mono)}
 tr.used td{background:var(--ok-bg)}
-tr.weak td{color:#9aa4b2}
+tr.weak td{color:var(--faint)}
 tr.forced td:first-child{box-shadow:inset 3px 0 var(--accent)}
 .scroll{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:8px}
 .seg button{border-radius:0;padding:1px 7px;font-size:11px}
 .seg button:first-child{border-radius:5px 0 0 5px}.seg button:last-child{border-radius:0 5px 5px 0}
-.seg button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.seg button.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
 
 .steps{margin:6px 0 0 0;padding-left:20px}
 .steps li{margin:3px 0}
@@ -107,7 +130,32 @@ tr.forced td:first-child{box-shadow:inset 3px 0 var(--accent)}
 .toast.on{opacity:1}
 .toast.err{background:#8c1d1d}
 .hint{font-size:12px;color:var(--muted)}
-.chart{width:100%;height:150px;background:#fbfcfd;border:1px solid var(--line);border-radius:8px}
+.chart{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:var(--c-bg)}
+.chart text{font:11px "Segoe UI",system-ui,sans-serif;fill:var(--c-axis)}
+.chart .grid{stroke:var(--c-grid);stroke-width:1}
+.chart .sigma{fill:var(--c-sigma)}
+.chart .floor{fill:var(--c-floor)}
+.chart .kd{fill:var(--c-kd)}
+.chart .kdl{stroke:var(--c-kd-line);stroke-width:1;stroke-dasharray:3 3}
+.chart .mean{stroke:var(--c-mean);stroke-width:1.5}
+.chart .fit{stroke:var(--c-fit);stroke-width:1;stroke-dasharray:5 4}
+.chart .hist{fill:var(--c-hist)}
+.chart .p0{fill:var(--c-weak);opacity:.55}
+.chart .p1{fill:var(--c-snr1)}.chart .p2{fill:var(--c-snr2)}.chart .p3{fill:var(--c-snr3)}
+.chart .hollow{fill:none!important;stroke-width:1.4}
+.chart .hollow.p0{stroke:var(--c-weak)}.chart .hollow.p1{stroke:var(--c-snr1)}.chart .hollow.p2{stroke:var(--c-snr2)}.chart .hollow.p3{stroke:var(--c-snr3)}
+.chart .clip{opacity:.5}
+.key{display:inline-flex;gap:10px;flex-wrap:wrap;align-items:center}
+.key i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.key .k0{background:var(--c-weak)}.key .k1{background:var(--c-snr1)}.key .k2{background:var(--c-snr2)}.key .k3{background:var(--c-snr3)}
+.key .ks{background:var(--c-sigma);border-radius:2px;width:14px}.key .kf{background:var(--c-floor);border-radius:2px;width:14px}.key .kk{background:var(--c-kd);border:1px dashed var(--c-kd-line);border-radius:2px;width:14px}
+.livebox{border:1px dashed var(--accent);border-radius:8px;padding:10px 12px;margin-top:10px;background:var(--panel)}
+.livebox .tag{font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--accent)}
+.lstats{display:flex;gap:22px;flex-wrap:wrap;margin:8px 0}
+.lstats div .v{font-family:var(--mono);font-size:16px;font-weight:600}
+.lstats div .v.big{font-size:19px;color:var(--accent)}
+.stgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:10px;margin-top:8px}
+.stgrid h4{margin:0 0 3px;font-size:13px}
 label.chk{display:inline-flex;gap:6px;align-items:center}
 pre.report{background:#0f141c;color:#d7e0ec;padding:12px;border-radius:8px;font-size:12px;overflow:auto;max-height:520px}
 </style>
@@ -245,6 +293,7 @@ function events(){
     ev.push({id:r.id+'-30left', t:kd+30e3, run:rv, label:'30 s left', say:'Thirty seconds left.'});
     ev.push({id:r.id+'-ku', t:kd+60e3, run:rv, label:rv.title+' carrier ends', slot:r.id,
       say:`Carrier ended. Press Capture for ${speakTitle(rv)}, and enter the dial you used.`, longbeep:true});
+    if(S.session.auto_capture) ev.push({id:r.id+'-auto', t:kd+120e3, run:rv, quiet:true, autocap:r.id});
   });
   const p=S.practice;
   if(p && started(p.run)){
@@ -257,6 +306,7 @@ function events(){
     ev.push({id:'p-30left'+tag, t:kd+30e3, run:p, label:'Practice: 30 s left', say:'Thirty seconds left.'});
     ev.push({id:'p-ku'+tag, t:kd+60e3, run:p, label:'Practice: capture', slot:'practice',
       say:'Practice minute is over. Import the file: press Capture on the practice tab, and enter the dial you used.', longbeep:true});
+    if(S.session.auto_capture) ev.push({id:'p-auto'+tag, t:kd+120e3, run:p, quiet:true, autocap:'practice'});
   }
   ev.push({id:'cala-start', t:lastUp+60e3, label:'Start after calibration', slot:'cal_after',
     say:'All runs are done. Start the after calibration on W W V, let it run several cycles, then capture it.', beep:true});
@@ -268,6 +318,7 @@ function fire(e){
   if(fired.has(e.id+'@'+e.t)) return;
   fired.add(e.id+'@'+e.t); safeSet('fired', JSON.stringify([...fired].slice(-200)));
   if(e.pip){ beep(1000,90); return }
+  if(e.autocap){ autoCapture(e.autocap); return }
   if(e.longbeep) beep(1320,600,0.3); else if(e.beep) beep(880,200);
   if(e.say) setTimeout(()=>say(e.say), e.longbeep?650:(e.beep?250:0));
   if(e.tune && S.session.flex.enabled && S.session.flex.auto_tune && e.run){
@@ -300,6 +351,7 @@ function tick(){
     else if(left<=5 && Math.abs(left-Math.round(left))<0.13) beep(1000,60);
   }
   if(!S) return;
+  liveSync(now);
   const ev=events();
   for(const e of ev) if(now>=e.t && now<e.t+20e3) fire(e);
   const nx=ev.find(e=>!e.quiet && e.t>now);
@@ -342,6 +394,18 @@ async function capture(id){
         try{ toast(await api().CaptureSlot(id,true)) }catch(e2){ toast(String(e2),true) }
       }
     } else toast(String(e), true);
+  }
+  refresh();
+}
+// autoCapture captures a step one minute after key-up (Setup option, off by
+// default). It never replaces a file already in the slot.
+async function autoCapture(id){
+  const rv=runById(id);
+  if(!rv || rv.present) return;
+  try{ toast('Automatic capture: '+await api().CaptureSlot(id,false)); say('Captured automatically. Check the result, and enter the dial you used.') }
+  catch(e){
+    // REPLACE means the slot was filled meanwhile (by hand, or by another window).
+    if(!String(e).includes('REPLACE')) toast('Automatic capture of '+rv.title+' failed: '+e+'. Press Capture yourself.', true);
   }
   refresh();
 }
@@ -415,6 +479,7 @@ function calCard(c, when){
       <b>Stations / StdDev</b><span class="mono">${r.n_fit} / ${r.rms.toFixed(3)} Hz</span>
       <b>Readings</b><span>${r.used} used of ${r.total} (${r.first}-${r.last} UTC)</span></div>`:''}
     <div class="row" style="margin-top:10px">${slotButtons(c.id, c.present)}<button onclick="showTab('cal')">Details</button></div>
+    ${L.step===c.id? calLiveBlock(c):''}
     ${issuesHTML(issues)}
   </div>`;
 }
@@ -449,6 +514,7 @@ function runCard(rv, idx){
       </div>
     </div>
     <div class="row" style="margin-top:10px">${slotButtons(r.id, rv.present)}${rv.present?`<button onclick="selRun='${r.id}';showTab('runs')">Readings</button>`:''}</div>
+    ${L.step===r.id? liveBlock(rv):''}
     ${issuesHTML(allIssues)}
   </div>`;
 }
@@ -496,7 +562,7 @@ function renderCal(){
     const r=c.result;
     h+=`<div class="card"><div class="row"><h2 class="grow">${esc(c.title)}</h2>
       <span class="hint">Ignore readings below</span><input class="num" style="width:60px" type="number" value="${c.cal.min_snr}" onchange="call('SetCalSNR','${c.id}',+this.value)"> dB S/N
-      ${slotButtons(c.id, c.present)}</div>
+      ${slotButtons(c.id, c.present)}${watchButton(c.id)}</div>
       ${c.cal.slot.file?`<div class="hint">File: ${esc(c.cal.slot.file)} · from ${esc(c.cal.slot.source)}</div>`:''}
       ${issuesHTML(c.issues)}`;
     if(r){
@@ -512,30 +578,275 @@ function renderCal(){
           <td class="hint">${esc(s.note)}</td></tr>`}).join('')}</table>`;
       h+=issuesHTML(r.issues);
     }
+    h+= L.step===c.id? calLiveBlock(c) : calCaptured(c);
     h+='</div>';
   }
   put('calPanel', h);
 }
 
-function chart(res){
-  const pts=res.lines.filter(l=>!l.flag);
-  if(!pts.length) return '';
-  const used=res.lines.filter(l=>l.used).map(l=>l.fmeas);
-  const mid = used.length? used.reduce((a,b)=>a+b,0)/used.length : pts[0].fmeas;
-  const span=3, W=900, H=150;
-  const t0=pts[0].sec, t1=Math.max(pts[pts.length-1].sec, t0+1);
-  const x=s=>10+(((s-t0+86400)%86400)/((t1-t0+86400)%86400||1))*(W-20);
-  const y=v=>{ const c=Math.max(-span,Math.min(span,v-mid)); return H/2 - c/span*(H/2-12) };
-  let svg=`<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-    <line x1="0" x2="${W}" y1="${H/2}" y2="${H/2}" stroke="#c9d1dc" stroke-dasharray="4 4"/>
-    <text x="6" y="14" font-size="11" fill="#5f6b7a">${(mid+span).toFixed(2)} Hz</text><text x="6" y="${H-4}" font-size="11" fill="#5f6b7a">${(mid-span).toFixed(2)} Hz</text>`;
-  for(const l of res.lines){
-    const c = l.used? '#1a7f37' : (l.flag||l.snr<20? '#c5ccd6':'#d4a72c');
-    svg+=`<circle cx="${x(l.sec).toFixed(1)}" cy="${y(l.fmeas).toFixed(1)}" r="${l.used?3.5:2.5}" fill="${c}"><title>${l.time} ${l.fmeas.toFixed(3)} Hz S/N ${l.snr}</title></circle>`;
+// ------------------------------------------------------------------ stability chart
+function sdiff(a,b){ let d=((a-b)%86400+86400)%86400; return d>=43200? d-86400 : d }
+function sod(t){ const d=new Date(t); return d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds() }
+function hms(sec){ sec=((sec%86400)+86400)%86400; return [sec/3600|0,(sec/60|0)%60,sec%60].map(v=>String(v).padStart(2,'0')).join(':') }
+function sgn(v,d){ return (v>0?'+':v<0?'−':'')+Math.abs(v).toFixed(d) }
+function meanSD(v){ const n=v.length; if(!n) return {n:0,mean:0,sd:0}; const m=v.reduce((a,b)=>a+b,0)/n; return {n, mean:m, sd: n>1? Math.sqrt(v.reduce((a,b)=>a+(b-m)*(b-m),0)/(n-1)) : 0} }
+// linFit is an unweighted least-squares line y = a + b*x.
+function linFit(xs, ys){
+  const n=xs.length; let sx=0,sy=0,sxy=0,sx2=0;
+  for(let i=0;i<n;i++){ sx+=xs[i]; sy+=ys[i]; sxy+=xs[i]*ys[i]; sx2+=xs[i]*xs[i] }
+  const d=n*sx2-sx*sx;
+  if(!n) return {a:0,b:0}; if(!d) return {a:sy/n,b:0};
+  return {a:(sx2*sy-sx*sxy)/d, b:(n*sxy-sx*sy)/d};
+}
+function niceSpan(x){ for(const s of [0.25,0.5,1,2,5,10,20,50,100,200,500]) if(x<=s) return s; return Math.ceil(x/500)*500 }
+function snrClass(p, min){ if(p.flag||p.snr<min) return 'p0'; return p.snr<30?'p1': p.snr<40?'p2':'p3' }
+
+// stabilityChart plots readings as offsets in Hz from a reference (the mean
+// unless o.ref is given, e.g. 0 for "distance from the calibration fit").
+//   pts: [{sec, v, snr, flag, use, hollow, label}]; "use" marks the readings
+//        the mean, ±1σ band and histogram are taken from.
+//   o:   {minSNR, ref, refLabel, kd:[startSec,endSec], w, h, key}
+function stabilityChart(pts, o={}){
+  if(!pts.length) return '<div class="hint">No readings yet.</div>';
+  const min=o.minSNR ?? 20, W=o.w||900, H=o.h||180;
+  const used=pts.filter(p=>p.use), base=used.length? used : pts;
+  const st=meanSD(base.map(p=>p.v)), ref=o.ref ?? st.mean;
+  const t0=pts[0].sec, rel=s=>sdiff(s,t0);
+  let x0=0, x1=pts.reduce((m,p)=>Math.max(m,rel(p.sec)),0);
+  if(o.kd){ x0=Math.min(x0,rel(o.kd[0])); x1=Math.max(x1,rel(o.kd[1])) }
+  if(x1-x0<60) x1=x0+60;
+  let far=Math.abs(st.mean-ref)+1.2*st.sd;
+  for(const p of base) far=Math.max(far, 1.1*Math.abs(p.v-ref));
+  const span=niceSpan(Math.max(0.2,far)), dec=span<0.5?3:span<1?2:span<10?1:0;
+  const L=50, HW=64, PR=W-HW-14, T=10, B=H-20;
+  const X=s=>L+(rel(s)-x0)/(x1-x0)*(PR-L);
+  const Y=v=>{ const d=Math.max(-span,Math.min(span,v-ref)); return T+(span-d)/(2*span)*(B-T) };
+  const band=(c,lo,hi)=>{ const y1=Y(hi), y2=Y(lo); return y2-y1>0.3? `<rect class="${c}" x="${L}" width="${PR-L}" y="${y1.toFixed(1)}" height="${(y2-y1).toFixed(1)}"/>` : '' };
+  let s=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Readings over time, offset from ${o.ref!=null?(o.refLabel||'reference'):'the mean'}">`;
+  if(o.kd){
+    const a=Math.max(L,X(o.kd[0])), b=Math.min(PR,X(o.kd[1]));
+    s+=`<rect class="kd" x="${a.toFixed(1)}" y="${T}" width="${Math.max(0,b-a).toFixed(1)}" height="${B-T}"/>
+      <line class="kdl" x1="${a.toFixed(1)}" x2="${a.toFixed(1)}" y1="${T}" y2="${B}"/><line class="kdl" x1="${b.toFixed(1)}" x2="${b.toFixed(1)}" y1="${T}" y2="${B}"/>
+      <text x="${(a+3).toFixed(1)}" y="${T+11}">key-down</text>`;
   }
-  return svg+'</svg><div class="hint">Green: used. Amber: strong but not part of the carrier. Grey: weak. Vertical span ±3 Hz around the mean.</div>';
+  s+=band('floor', st.mean-0.05, st.mean+0.05);
+  if(base.length>1) s+=band('sigma', st.mean-st.sd, st.mean+st.sd);
+  for(const k of [-1,-0.5,0,0.5,1]){
+    const y=Y(ref+k*span).toFixed(1);
+    s+=`<line class="grid" x1="${L}" x2="${PR}" y1="${y}" y2="${y}"/><text x="${L-5}" y="${(+y+4).toFixed(1)}" text-anchor="end">${k? sgn(k*span,dec) : (o.ref!=null? (o.refLabel||'0') : 'mean')}</text>`;
+  }
+  s+=`<text x="${L-5}" y="${H-5}" text-anchor="end">Hz</text>`;
+  if(o.ref!=null) s+=`<line class="fit" x1="${L}" x2="${PR}" y1="${Y(ref).toFixed(1)}" y2="${Y(ref).toFixed(1)}"/>`;
+  s+=`<line class="mean" x1="${L}" x2="${PR}" y1="${Y(st.mean).toFixed(1)}" y2="${Y(st.mean).toFixed(1)}"><title>mean ${o.ref!=null? sgn(st.mean-ref,3)+' Hz from '+(o.refLabel||'reference') : st.mean.toFixed(3)+' Hz'}</title></line>`;
+  for(const p of pts){
+    const d=p.v-ref, cls=snrClass(p,min)+(p.hollow?' hollow':'')+(Math.abs(d)>span?' clip':'');
+    s+=`<circle class="${cls}" cx="${X(p.sec).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="${p.use?3.3:2.6}"><title>${esc(p.label||'')}</title></circle>`;
+  }
+  // Histogram of the readings in use, on the right edge.
+  const nb=16, bins=new Array(nb).fill(0);
+  for(const p of used){ const d=p.v-ref; if(Math.abs(d)<=span) bins[Math.min(nb-1,Math.floor((d+span)/(2*span)*nb))]++ }
+  const mx=Math.max(1,...bins), hx=PR+10, bh=(B-T)/nb;
+  s+=`<line class="grid" x1="${hx}" x2="${hx}" y1="${T}" y2="${B}"/>`;
+  bins.forEach((c,i)=>{ if(c) s+=`<rect class="hist" x="${hx}" y="${(B-(i+1)*bh+0.5).toFixed(1)}" width="${(c/mx*(HW-4)).toFixed(1)}" height="${Math.max(0.5,bh-1).toFixed(1)}"><title>${c} reading(s)</title></rect>` });
+  s+=`<text x="${L}" y="${H-5}">${hms(t0+x0)}</text><text x="${PR}" y="${H-5}" text-anchor="end">${hms(t0+x1)} UTC</text></svg>`;
+  if(o.key!==false) s+=chartKey(min, !!o.kd, o.ref!=null? o.refLabel : null);
+  return s;
+}
+function chartKey(min, kd, fit){
+  return `<div class="hint key" style="margin-top:3px"><span><i class="k3"></i>S/N ≥ 40 dB</span><span><i class="k2"></i>30-40</span><span><i class="k1"></i>${min}-30</span><span><i class="k0"></i>below ${min} dB (not used)</span>
+    <span><i class="ks"></i>±1σ around the mean</span><span><i class="kf"></i>±0.05 Hz measurement noise</span>${kd?'<span><i class="kk"></i>key-down</span>':''}${fit?`<span>dashed: ${esc(fit)}</span>`:''}</div>`;
+}
+function linePt(l, min, use, hollow){
+  return {sec:l.sec, v:l.fmeas, snr:l.snr, flag:l.flag, use, hollow,
+    label:`${l.time}  ${l.fmeas.toFixed(3)} Hz  S/N ${l.snr.toFixed(1)}${l.flag?'*':''}  (${l.khz} kHz)`};
 }
 
+// chart is the stability plot of a captured or loaded run file.
+function chart(res, rv, o={}){
+  const r=rv.run, min=r.min_snr||20;
+  const pts=res.lines.map(l=>linePt(l, min, l.used, !l.used && !(l.flag||l.snr<min)));
+  const kd=started(r)? sod(r.key_down) : null;
+  return stabilityChart(pts, {minSNR:min, kd: kd!=null?[kd,kd+60]:null, ...o}) +
+    (o.key===false? '' : '<div class="hint">Filled dots were used for the answer; hollow ones were strong but left out (CW ID, edges, outliers or your choice).</div>');
+}
+
+// ------------------------------------------------------------------ live follow
+// While a step is active the app follows fmt.all and sends each new reading.
+// Everything here is a preview: the submitted answer still comes from Capture.
+let L={step:'', gen:-1, lines:[], gone:false, err:'', since:0, lastNew:0};
+let liveAsked=null, liveManual='';
+const REFS=[[2500,'WWV 2.5 MHz'],[5000,'WWV 5 MHz'],[10000,'WWV 10 MHz'],[15000,'WWV 15 MHz'],[20000,'WWV 20 MHz'],[25000,'WWV 25 MHz'],
+  [3330,'CHU 3.33 MHz'],[7850,'CHU 7.85 MHz'],[14670,'CHU 14.67 MHz']];
+function refStation(khz){ return REFS.find(([k])=>khz>=k-1 && khz<=k+1) }
+
+function applyLive(snap){ L.step=snap.step||''; L.gen=snap.gen; L.gone=!!snap.gone; L.err=snap.err||''; L.lines=snap.lines||[] }
+function onLive(ev){
+  if(ev.gen!==L.gen && !ev.reset){ api().GetLive().then(s=>{ applyLive(s); render() }); return }
+  if(ev.reset) L.lines=[];
+  L.gen=ev.gen; L.gone=ev.gone; L.err=ev.err||''; L.step=ev.step;
+  // An event can arrive after a snapshot that already holds its lines; line
+  // numbers only grow within a generation, so skip any already held.
+  const lastN=L.lines.length? L.lines[L.lines.length-1].n : 0;
+  const fresh=(ev.lines||[]).filter(l=>l.n>lastN);
+  if(fresh.length){ L.lines=L.lines.concat(fresh); L.lastNew=Date.now() }
+  render();
+}
+// liveWanted is the step to follow now: the one on the schedule, or the one
+// the operator chose with Watch live.
+function liveWanted(now){
+  if(liveManual) return liveManual;
+  const p=phase(now);
+  if(p) return p.rv.run.id;
+  const ev=events(), at=id=>(ev.find(e=>e.id===id)||{}).t;
+  const cs=at('calb-start'), ce=at('calb-stop'), ca=at('cala-start');
+  if(cs && now>=cs && now<ce+4*60e3 && !S.cals[0].present) return 'cal_before';
+  if(ca && now>=ca && now<ca+40*60e3 && !S.cals[1].present) return 'cal_after';
+  return '';
+}
+function liveSync(now){
+  const want=liveWanted(now);
+  if(want===liveAsked) return;
+  if(want!==L.step){ L.since=Date.now(); L.lastNew=0 }
+  liveAsked=want;
+  api().LiveFollow(want).then(s=>{ applyLive(s); render() }).catch(e=>console.error(e));
+}
+function watchLive(id){ liveManual=id; liveSync(Date.now()); render() }
+
+// steadiness looks for jumps between readings and for two separate groups.
+function steadiness(vals){
+  const r={jumps:0, two:false, gap:0};
+  if(vals.length<6) return r;
+  const s=[...vals].sort((a,b)=>a-b), med=s[s.length>>1];
+  const mad=vals.map(v=>Math.abs(v-med)).sort((a,b)=>a-b)[vals.length>>1];
+  const sig=Math.max(0.03, 1.4826*mad);
+  for(let i=1;i<vals.length;i++) if(Math.abs(vals[i]-vals[i-1])>Math.max(0.5,5*sig)) r.jumps++;
+  let gi=0;
+  for(let i=1;i<s.length;i++) if(s[i]-s[i-1]>r.gap){ r.gap=s[i]-s[i-1]; gi=i }
+  const lo=meanSD(s.slice(0,gi)), hi=meanSD(s.slice(gi));
+  r.two = gi>=3 && s.length-gi>=3 && r.gap>Math.max(0.5, 3*Math.max(lo.sd,hi.sd));
+  return r;
+}
+function quietWarning(){
+  const quiet=(Date.now()-Math.max(L.since, L.lastNew))/1000, w=[];
+  if(L.err) w.push({level:'warn', msg:'Cannot read fmt.all just now ('+L.err+'). Retrying every second.'});
+  if(quiet>20) w.push({level:'warn', msg: L.gone
+    ? `There is no fmt.all in the WSJT-X folder after ${dur(quiet)}. Is Measure checked in WSJT-X, and does Setup point at the folder WSJT-X writes to?`
+    : `No new readings for ${dur(quiet)}. Check that Measure is checked in WSJT-X (mode FreqCal), the dial and mode (USB/DIGU) are right, and audio reaches WSJT-X.`});
+  return w;
+}
+function usableCal(c){ return c && c.result && c.result.ok && !errCount(c.issues) && !errCount(c.result.issues) }
+
+// liveRun works out the live numbers for a run or the practice run.
+function liveRun(rv){
+  const r=rv.run, min=r.min_snr||20, now=Date.now();
+  const kdms=started(r)? new Date(r.key_down).getTime() : 0, kd=kdms? sod(r.key_down) : null;
+  const strong=l=>!l.flag && l.snr>=min;
+  const inKD=l=>kd!=null && sdiff(l.sec,kd)>=0 && sdiff(kd+65,l.sec)>=0;
+  const keyed=!!kdms && now>=kdms && L.lines.some(l=>strong(l)&&inKD(l));
+  const use=l=>strong(l) && (!keyed || inKD(l));
+  const good=L.lines.filter(use), vals=good.map(l=>l.fmeas), st=meanSD(vals);
+  const sem=st.n>1? st.sd/Math.sqrt(st.n) : 0;
+  let drift=null;
+  // A slope through a few seconds of readings is mostly noise.
+  if(st.n>=5 && sdiff(good[st.n-1].sec, good[0].sec)>=20){ const t0=good[0].sec; drift=linFit(good.map(l=>sdiff(l.sec,t0)/60), vals).b }
+  const typed=r.dial_hz>0, dial=typed? r.dial_hz : rv.suggest_dial_hz;
+  let corr=0, corrNote='uncorrected (no usable calibration yet)';
+  const cal=[S.cals[0], ...(r.id==='practice'?[S.cals[1]]:[])].find(usableCal);
+  if(st.n && cal){ const f=(dial+st.mean)/1e6; corr=cal.result.a+cal.result.b*f; corrNote=`${cal.id==='cal_before'?'before':'after'}-calibration correction ${sgn(corr,3)} Hz` }
+  const carrier=st.n? dial+st.mean-corr : null;
+  const warn=quietWarning();
+  const recent=L.lines.filter(strong).slice(-10);
+  if(recent.length>=3){
+    const df=meanSD(recent.map(l=>l.df)).mean, off=recent[recent.length-1].offset;
+    if(Math.abs(df)>25) warn.push({level:'warn', msg:`The tone is at ${(off+df).toFixed(1)} Hz, ${sgn(df,1)} Hz from ${off} Hz. The dial is off or this is the wrong station: use Tone is at… and retune${r.id==='practice'?'':' (before the last 30 seconds)'}.`});
+  }
+  const khz=[...new Set(L.lines.filter(strong).slice(-30).map(l=>l.khz))];
+  if(khz.length>1) warn.push({level:'warn', msg:`Recent readings come from more than one frequency (${khz.join(', ')} kHz). Is the calibration cycle still on in WSJT-X? Turn it off for the runs, and press Capture between steps.`});
+  if(keyed || r.id==='practice'){
+    const sd=steadiness(vals);
+    if(sd.two) warn.push({level:'warn', msg:`Readings fall into two groups ${sd.gap.toFixed(2)} Hz apart. The calibration cycle may be switching, the dial was touched, or there is QRM: check the WSJT-X waterfall.`});
+    else if(sd.jumps) warn.push({level:'warn', msg:`${sd.jumps} sudden jump(s) of more than 0.5 Hz between readings: QRM, fading or the dial being touched.`});
+  }
+  const basis = keyed? `Using the ${st.n} strong reading(s) inside the key-down minute.`
+    : kdms && now<kdms ? 'Before key-down: these numbers include everything strong so far (the CW ID too). From key-down on, only the carrier minute is used.'
+    : 'Using every strong reading in fmt.all so far.';
+  const pts=L.lines.map(l=>linePt(l, min, use(l), false));
+  return {min, kd, st, sem, drift, typed, dial, corr, corrNote, carrier, warn, basis, pts};
+}
+function liveBlock(rv, w){
+  const x=liveRun(rv), n=x.st.n;
+  return `<div class="livebox"><div class="row"><span class="tag">Live preview</span>
+      <span class="hint grow">Following fmt.all (${L.lines.length} line${L.lines.length===1?'':'s'}). Not the value to submit: press Capture, and the answer comes from the captured file.</span></div>
+    <div class="lstats">
+      <div><div class="hint">Good readings</div><div class="v">${n}</div></div>
+      <div><div class="hint">Mean fMeas</div><div class="v">${n? x.st.mean.toFixed(3)+' Hz':'-'}</div></div>
+      <div><div class="hint">σ</div><div class="v">${n>1? x.st.sd.toFixed(3)+' Hz':'-'}</div></div>
+      <div><div class="hint">Drift</div><div class="v">${x.drift!=null? sgn(x.drift,3)+' Hz/min':'-'}</div></div>
+      <div><div class="hint">σ/√N</div><div class="v">${n>1? '±'+x.sem.toFixed(3)+' Hz':'-'}</div></div>
+      <div><div class="hint">Live carrier</div><div class="v big">${x.carrier!=null? fmtHz(x.carrier)+' ± '+x.sem.toFixed(2):'-'}</div></div>
+    </div>
+    <div class="hint">${esc(x.basis)} Carrier = ${x.typed?'dial you typed':'<b>suggested</b> dial (type the dial you used)'} ${fmtKHz(x.dial)} + mean fMeas − ${esc(x.corrNote)}.</div>
+    ${stabilityChart(x.pts, {minSNR:x.min, kd: x.kd!=null?[x.kd,x.kd+60]:null, w})}
+    ${issuesHTML(x.warn)}</div>`;
+}
+
+// calStations groups calibration readings by station, as the Go analysis does
+// (without its outlier rejection, so live numbers can differ slightly).
+function calStations(lines, min, toggles){
+  const by=new Map();
+  for(const l of lines){ if(!by.has(l.khz)) by.set(l.khz,[]); by.get(l.khz).push(l) }
+  return [...by.keys()].sort((a,b)=>a-b).map(khz=>{
+    const ls=by.get(khz), ref=refStation(khz), good=ls.filter(l=>!l.flag && l.snr>=min), st=meanSD(good.map(l=>l.df));
+    let inc=!!ref; if(toggles && khz in toggles) inc=toggles[khz];
+    return {khz, label: ref? ref[1] : (khz/1000).toFixed(3)+' MHz (not WWV/CHU)', lines:ls, n:st.n, mean:st.mean, sd:st.sd, included: inc && st.n>0};
+  });
+}
+function calFit(sts){
+  const u=sts.filter(s=>s.included);
+  if(!u.length) return null;
+  return linFit(u.map(s=>s.khz/1000), u.map(s=>s.mean));
+}
+// calPanels draws one chart per station: each reading's DF minus the fit at
+// that frequency, so the mean line shows how far the station sits from the fit.
+function calPanels(sts, fit, min){
+  if(!sts.length) return '<div class="hint">No readings yet.</div>';
+  return '<div class="stgrid">'+sts.map(s=>{
+    const at=fit? fit.a+fit.b*s.khz/1000 : s.mean;
+    const pts=s.lines.map(l=>({...linePt(l,min,!l.flag&&l.snr>=min,false), v:l.df-at}));
+    return `<div><h4>${esc(s.label)} <span class="hint" style="font-weight:400">n=${s.n}${s.n? ' · '+sgn(s.mean-at,3)+' Hz from the fit':''}${s.n>1?' · σ '+s.sd.toFixed(3):''}${s.included?'':' · not in the fit'}</span></h4>
+      ${stabilityChart(pts,{minSNR:min, ref:0, refLabel:'fit', w:440, h:140, key:false})}</div>`;
+  }).join('')+'</div>'+chartKey(min,false,'the calibration fit at this frequency (A + B·f)');
+}
+function calLiveBlock(c){
+  const min=c.cal.min_snr||20, sts=calStations(L.lines, min, c.cal.stations), fit=calFit(sts), w=quietWarning();
+  for(const s of sts){
+    if(s.n>=3 && Math.abs(s.mean)>25) w.push({level:'warn', msg:`${s.label} reads ${sgn(s.mean,1)} Hz from the tone it should give. Is the dial right, and is the WSJT-X calibration (Settings > Frequencies) zero?`});
+    const sd=steadiness(s.lines.filter(l=>!l.flag&&l.snr>=min).map(l=>l.df));
+    if(sd.two||sd.jumps>1) w.push({level:'warn', msg:`${s.label}: readings jump or split into two groups. Fading, QRM, or another station on frequency.`});
+  }
+  const nf=sts.filter(s=>s.included).length;
+  return `<div class="livebox"><div class="row"><span class="tag">Live preview</span>
+      <span class="hint grow">Following fmt.all (${L.lines.length} lines). The calibration used for the answers comes from the captured file.</span></div>
+    <div class="lstats"><div><div class="hint">Stations in the fit</div><div class="v">${nf}</div></div>
+      <div><div class="hint">Slope B</div><div class="v">${fit&&nf>1? fit.b.toFixed(4)+' ppm':'-'}</div></div>
+      <div><div class="hint">Intercept A</div><div class="v">${fit? fit.a.toFixed(3)+' Hz':'-'}</div></div></div>
+    ${calPanels(sts, fit, min)}${issuesHTML(w)}</div>`;
+}
+// calCaptured draws the stations of a captured calibration against its fit.
+function calCaptured(c){
+  const r=c.result, min=c.cal.min_snr||20;
+  if(!r || !r.ok || !c.lines) return '';
+  const inc=new Map(r.stations.map(s=>[s.khz,s.included]));
+  const sts=calStations(c.lines, min, c.cal.stations).map(s=>({...s, included: inc.get(s.khz)??s.included}));
+  return `<h3>Stations against the fit</h3>${calPanels(sts, r, min)}`;
+}
+
+// watchButton follows fmt.all for a step outside its scheduled time.
+function watchButton(id){
+  if(liveManual===id) return `<button onclick="watchLive('')">Stop watching</button>`;
+  if(L.step===id) return '';
+  return `<button onclick="watchLive('${id}')" title="Show the readings WSJT-X is writing now, without waiting for the schedule">Watch live</button>`;
+}
 function renderRuns(){
   if(!selRun || !S.runs.find(r=>r.run.id===selRun)) selRun=(S.runs.find(r=>r.present)||S.runs[0]).run.id;
   let h='<div class="row" style="margin-bottom:10px">'+S.runs.map((rv,i)=>`<button class="${rv.run.id===selRun?'primary':''}" onclick="selRun='${rv.run.id}';renderRuns()">Run ${i+1}: ${esc(rv.title)}</button>`).join('')+'</div>';
@@ -559,7 +870,7 @@ function runDetail(rv){
       <div><div class="hint">SD / SEM</div><div class="answer">${res.n>1?res.sd.toFixed(3)+' / '+res.sem.toFixed(3):'-'}</div></div>
       <div><div class="hint">Dial must be in</div><div class="answer" style="font-size:15px">${res.n?fmtKHz(res.dial_min)+' - '+fmtKHz(res.dial_max):'-'}</div></div>
       <div><div class="hint">Carrier</div><div class="answer ${rv.ready?'ok':''}">${rv.final_hz!=null?fmtHz(rv.final_hz):'-'}</div></div></div>`;
-    h+=chart(res);
+    h+=chart(res, rv);
     h+=issuesHTML([...(rv.issues||[]), ...(res.issues||[])]);
     h+=`<h3>Readings</h3><div class="scroll"><table><tr><th class="n">Line</th><th>UTC</th><th class="n">kHz</th><th class="n">Offset</th><th class="n">fMeas</th><th class="n">DF</th><th class="n">S/N</th><th>Status</th><th>Use</th></tr>
       ${res.lines.map(l=>`<tr class="${l.used?'used':''} ${(l.flag||l.snr<r.min_snr)?'weak':''} ${l.forced?'forced':''}"><td class="n">${l.n}</td><td class="mono">${l.time}</td><td class="n">${l.khz}</td><td class="n">${l.offset}</td>
@@ -582,6 +893,10 @@ function renderResults(){
     <div class="row" style="margin-top:12px"><button class="primary" onclick="makeReport()">Save report &amp; show</button><button onclick="copyResults()">Copy results</button><button onclick="api().OpenSessionFolder()">Open session folder</button>
       <button onclick="openURL('https://fmt.arrl.org/fmtentry.php')">ARRL FMT data entry page ↗</button></div>
     <div id="reportOut"></div></div>`;
+  const got=S.runs.filter(rv=>rv.result&&rv.result.lines&&rv.result.lines.length);
+  if(got.length) h+=`<div class="card"><h2>Stability of each run</h2><div class="hint">fMeas through each captured file, as an offset from the mean of the readings used. A steady carrier stays within a few tenths of a hertz.</div>
+    <div class="stgrid">${got.map(rv=>`<div><h4>${esc(rv.title)} <span class="hint" style="font-weight:400">${rv.result.n?'n='+rv.result.n+' · σ '+rv.result.sd.toFixed(3)+' Hz · σ/√N '+rv.result.sem.toFixed(3)+' Hz':''}</span></h4>${chart(rv.result, rv, {w:440, h:150, key:false})}</div>`).join('')}</div>
+    ${chartKey(20,true)}<div class="hint">Filled dots were used for the answer; hollow ones were strong but left out.</div></div>`;
   put('resultsPanel', h);
 }
 
@@ -681,7 +996,7 @@ function renderPractice(){
         <label class="chk"><input id="pFresh" type="checkbox" checked> Start a fresh fmt.all</label></span>
     </div>
     <div class="row" style="margin-top:10px"><button class="primary" onclick="startPractice()">${kd?'Restart practice':'Start practice'}</button>
-      ${kd&&now<kd+60e3?`<button onclick="call('CancelPractice')">Cancel countdown</button>`:''}</div>
+      ${kd&&now<kd+60e3?`<button onclick="call('CancelPractice')">Cancel countdown</button>`:''}${watchButton('practice')}</div>
     ${kd?`<div class="hint" style="margin-top:6px">Measuring minute: ${hhmmss(r.key_down)}-${hhmmss(pv.key_up)} UTC</div>`:''}
     <h3>Dial</h3>
     <div class="kv">
@@ -702,6 +1017,7 @@ function renderPractice(){
     ${dev!=null?`<div class="hint" style="margin-top:4px">${isWWV?'WWV is exact: within ±0.3 Hz is excellent for a calibrated radio.':'Broadcast carriers are often 1-2 Hz off nominal. Compare with other nights rather than expecting zero.'}</div>`:''}
     <div class="row" style="margin-top:10px">${slotButtons('practice', pv.present)}</div>
   </div>
+  ${L.step==='practice'? `<div class="card"><h2>Live readings</h2>${liveBlock(pv, 600)}</div>` : ''}
   </div></div>`;
   if(pv.present) h+=runDetail(pv);
   put('practicePanel', h);
@@ -740,6 +1056,11 @@ function renderSetup(){
     <span class="hint">Volume</span><input type="range" min="10" max="100" value="${s.volume||100}" onchange="call('SetVoice',${s.voice},+this.value,${s.beeps})">
     <button onclick="beep(880,200);setTimeout(()=>say('Voice prompts are working. Key down in thirty seconds.'),250)">Test</button></div>
     <div class="hint" style="margin-top:6px">${S.voice_ok?'Using the Windows voice.':'Windows voice unavailable; using the browser voice.'} Prompts: calibration start and stop, each call-up (with the dial to set), two minutes, 30 s, a 5-second countdown, key-down, 30 s left, and carrier end.</div></div>
+  <div class="card"><h2>Live readings</h2>
+    <div class="hint">While a step is on (calibration, each run from call-up, practice), the app reads the new lines WSJT-X adds to fmt.all every second and shows
+    live numbers and a stability chart. It only reads fmt.all; it never changes or locks it. The live numbers are a preview: the answer always comes from Capture.</div>
+    <label class="chk" style="margin-top:8px"><input type="checkbox" ${s.auto_capture?'checked':''} onchange="call('SetAutoCapture',this.checked)"> Capture automatically one minute after each key-up</label>
+    <div class="hint">Off by default. It captures only a slot that is still empty, so it never replaces a file. You still type the dial you used.</div></div>
   </div><div>
   <div class="card"><h2>Schedule (UTC)</h2><div class="hint">Defaults are the November 13, 2026 test. Call-up is 5 minutes before key-down; the carrier lasts 1 minute.</div>
     <table style="margin-top:8px"><tr><th>Station</th><th>Band</th><th>Near (kHz)</th><th>Key-down (UTC)</th><th></th></tr>
@@ -795,6 +1116,8 @@ async function refresh(){
 window.addEventListener('DOMContentLoaded', ()=>{
   showTab(safeGet('tab')||'night');
   window.runtime.EventsOn('changed', refresh);
+  window.runtime.EventsOn('live', onLive);
+  api().GetLive().then(applyLive);
   refresh(); setInterval(refresh, 1500);
   setInterval(tick, 200); tick();
   // Audio needs a user gesture before it may play.
