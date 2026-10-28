@@ -475,6 +475,14 @@ and table as the Run analysis tab. See
 Session, WSJT-X folder, voice and sound, schedule, and FlexRadio. See
 [One-time setup](#one-time-setup).
 
+### About tab
+
+The version, author and license, and links to the
+[ARRL FMT page](https://fmt.arrl.org/), the
+[FMT data entry page](https://fmt.arrl.org/fmtentry.php), the fmt-nuts group,
+these instructions, the latest release, and the issue tracker. Links open in your
+web browser. The Results tab also has an **ARRL FMT data entry page** button.
+
 ## Checks and warnings, and what to do about them
 
 **Red** messages are errors: the run isn't Ready until they're fixed. **Amber**

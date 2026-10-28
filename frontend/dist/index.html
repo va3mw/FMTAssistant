@@ -146,6 +146,7 @@ pre.report{background:#0f141c;color:#d7e0ec;padding:12px;border-radius:8px;font-
   <button data-tab="results" onclick="showTab('results')">Results</button>
   <button data-tab="practice" onclick="showTab('practice')">Practice</button>
   <button data-tab="setup" onclick="showTab('setup')">Setup &amp; radio<span class="badge" id="bSetup" hidden></span></button>
+  <button data-tab="about" onclick="showTab('about')">About</button>
 </nav>
 <main>
   <section class="tab on" id="tab-night"><div class="layout"><div id="timeline"></div><div id="side"></div></div></section>
@@ -154,6 +155,7 @@ pre.report{background:#0f141c;color:#d7e0ec;padding:12px;border-radius:8px;font-
   <section class="tab" id="tab-results"><div id="resultsPanel"></div></section>
   <section class="tab" id="tab-practice"><div id="practicePanel"></div></section>
   <section class="tab" id="tab-setup"><div id="setupPanel"></div></section>
+  <section class="tab" id="tab-about"><div id="aboutPanel"></div></section>
 </main>
 <div class="toast" id="toast"></div>
 
@@ -384,8 +386,11 @@ function render(){
   badge('bCal', S.cals.reduce((n,c)=>n+errCount(c.issues)+errCount(c.result&&c.result.issues),0));
   badge('bRuns', S.runs.reduce((n,r)=>n+errCount(r.result&&r.result.issues),0));
   badge('bSetup', errCount(S.wsjtx.issues)+errCount(f.issues));
-  renderTimeline(); renderSide(); renderCal(); renderRuns(); renderResults(); renderPractice(); renderSetup();
+  renderTimeline(); renderSide(); renderCal(); renderRuns(); renderResults(); renderPractice(); renderSetup(); renderAbout();
 }
+// openURL opens a link in the user's browser, not inside the app window.
+function openURL(u){ try{ window.runtime.BrowserOpenURL(u) }catch(e){ window.open(u,'_blank') } }
+function link(u, text){ return `<a href="#" onclick="openURL('${u}');return false">${text||esc(u)}</a>` }
 function badge(id,n){ const b=document.getElementById(id); b.hidden=!n; b.textContent=n }
 
 function slotButtons(id, present){
@@ -574,9 +579,51 @@ function renderResults(){
       <td class="n">${rv.result&&rv.result.n?rv.result.mean_fmeas.toFixed(3):'-'}</td><td class="n">${rv.corr_hz!=null?rv.corr_hz.toFixed(3):'-'}</td>
       <td class="n"><span class="answer ${rv.ready?'ok':''}" style="font-size:16px">${rv.final_hz!=null?fmtHz(rv.final_hz):'-'}</span></td>
       <td>${statusChip(rv.ready, rv.present, [...(rv.issues||[]),...((rv.result&&rv.result.issues)||[])])}</td></tr>`).join('')}</table>
-    <div class="row" style="margin-top:12px"><button class="primary" onclick="makeReport()">Save report &amp; show</button><button onclick="copyResults()">Copy results</button><button onclick="api().OpenSessionFolder()">Open session folder</button></div>
+    <div class="row" style="margin-top:12px"><button class="primary" onclick="makeReport()">Save report &amp; show</button><button onclick="copyResults()">Copy results</button><button onclick="api().OpenSessionFolder()">Open session folder</button>
+      <button onclick="openURL('https://fmt.arrl.org/fmtentry.php')">ARRL FMT data entry page ↗</button></div>
     <div id="reportOut"></div></div>`;
   put('resultsPanel', h);
+}
+
+function renderAbout(){
+  const h=`<div class="grid2"><div>
+  <div class="card"><h2>FMT Assistant v${esc(S.version)}</h2>
+    <p style="margin:6px 0">A helper for the ARRL Frequency Measuring Test (FMT). It tells you when and where to tune, captures the
+    WSJT-X FreqCal <b>fmt.all</b> file for each step, corrects each run with your WWV calibration, and checks for the mistakes that
+    cost people a good result. You still operate WSJT-X by hand; FlexRadio control is optional.</p>
+    <div class="kv" style="margin-top:8px">
+      <b>Version</b><span>${esc(S.version)}</span>
+      <b>Author</b><span>Michael, VA3MW</span>
+      <b>License</b><span>MIT, © 2026 Michael VA3MW. Free to use, copy and change.</span>
+      <b>Source</b><span>${link('https://github.com/va3mw/FMTAssistant','github.com/va3mw/FMTAssistant')}</span>
+    </div>
+  </div>
+  <div class="card"><h2>The ARRL FMT</h2>
+    <ul class="steps">
+      <li>${link('https://fmt.arrl.org/','ARRL Frequency Measuring Test')}: schedule, rules and past results.</li>
+      <li>${link('https://fmt.arrl.org/fmtentry.php','FMT data entry page')}: where you submit the Carrier frequency for each run.</li>
+      <li>${link('https://groups.io/g/fmt-nuts','fmt-nuts group')}: announcements, practice runs and discussion.</li>
+      <li>${link('http://www.k5cm.com','K5CM')}: one of the FMT transmitting stations.</li>
+    </ul>
+  </div>
+  </div><div>
+  <div class="card"><h2>Help</h2>
+    <ul class="steps">
+      <li>${link('https://github.com/va3mw/FMTAssistant#readme','Full instructions (README)')}: setup, test night step by step, practice, and troubleshooting.</li>
+      <li>${link('https://va3mw.github.io/FMTAssistant/','Project page')}</li>
+      <li>${link('https://github.com/va3mw/FMTAssistant/releases/latest','Latest release')}: check here for a newer version.</li>
+      <li>${link('https://github.com/va3mw/FMTAssistant/issues','Report a problem')}</li>
+    </ul>
+  </div>
+  <div class="card"><h2>Credits</h2>
+    <ul class="steps">
+      <li>Procedure: <i>Measuring a Carrier Frequency with WSJT-X for the ARRL FMT</i>, VA3MW, October 2026.</li>
+      <li>WSJT-X FreqCal and the calibration method: Joe Taylor, K1JT, and the WSJT Development Group.
+      See ${link('https://wsjt.sourceforge.io/FMT_User.pdf','Accurate Frequency Measurements with your WSPR Setup')}.</li>
+    </ul>
+  </div>
+  </div></div>`;
+  put('aboutPanel', h);
 }
 async function makeReport(){ try{ const t=await api().Report(); lastJSON.resultsPanel=null; document.getElementById('reportOut').innerHTML='<pre class="report">'+esc(t)+'</pre>'; toast('Saved "FMT results.txt" in the session folder.') }catch(e){ toast(String(e),true) } }
 async function copyResults(){
