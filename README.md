@@ -165,12 +165,14 @@ Do this a few days before the test.
 4. Make sure you can find the **Measure** check box on the main window. It must be
    checked whenever you measure; without it, WSJT-X shows readings on screen but
    never writes them to `fmt.all`.
-5. Optional but wise: **Save > Save all**, so WSJT-X records a `.wav` of each period
-   as a backup.
+5. WSJT-X can't record the audio for you: in FreqCal mode it writes only `fmt.all`
+   and no `.wav` files, even with **Save > Save all** on. If you want a recording,
+   set up a separate recorder (see [Test night](#test-night-step-by-step)).
 
 ### FMT Assistant
 
-Open the **Setup & radio** tab.
+Open the **Setup & radio** tab. (Until you enter your callsign, the Test night tab
+shows a *New here?* note with a button that takes you there.)
 
 1. **Callsign.** Enter it; it goes on the report.
 2. **WSJT-X log folder.** This is where WSJT-X writes `fmt.all`. Usually it's
@@ -246,20 +248,21 @@ signal is usually very strong. The app accepts frequencies from 500 kHz to 30 MH
 
 **Steps:**
 
-1. Optional but recommended: run a WWV calibration first and **Capture** it as
-   *Calibration before* on the Test night tab, so the practice answer is corrected
-   for your radio's error. Without a calibration, the practice answer is simply
-   dial + fMeas, uncorrected, and the app says so.
-2. Delete the old **fmt.all** (in WSJT-X, **File > Open log directory**), so
-   readings from an earlier session can't mix in with this one. The **Start a
-   fresh fmt.all** box does the same by renaming the file, but only if **Setup &
-   radio** points at the folder WSJT-X is writing to; deleting it yourself is the
-   sure way.
+1. **Rehearse in a session of its own.** In **Setup & radio**, press **New
+   session…** and call it, for example, `Practice`. Your schedule and settings come
+   with it. This keeps rehearsal files, and especially a rehearsal calibration, out
+   of your test-night session. Before the test, switch back with **Open session…**.
+2. Optional but recommended: run a WWV calibration first and **Capture** it as
+   *Calibration before* on the Test night tab (in the practice session), so the
+   practice answer is corrected for your radio's error. Without a calibration, the
+   practice answer is simply dial + fMeas, uncorrected, and the app says so.
 3. Open the **Practice** tab.
 4. Type the station's frequency in **kHz**, for example `1010`. (For WWV, use the
    **WWV 5 / 10 / 15** buttons.)
 5. Choose **Start measuring in** (1, 2 or 5 minutes; that's your call-up time).
-   Leave **Start a fresh fmt.all** ticked.
+   Leave **Start a fresh fmt.all** ticked: it moves the old `fmt.all` aside so
+   earlier readings can't mix in. (This needs **Setup & radio** to point at the
+   folder WSJT-X writes to; the WSJT-X panel on the Test night tab shows it.)
 6. Press **Start practice**. The app says the dial to set and counts down. The
    banner and the **Next** countdown work exactly as on test night.
 7. In WSJT-X: **Mode > FreqCal**, calibration cycle **off**, **Measure** on. Set
@@ -269,7 +272,9 @@ signal is usually very strong. The app accepts frequencies from 500 kHz to 30 MH
    1500 Hz, with the programme audio spread out above it. If the carrier isn't
    near 1500 Hz, press **Tone is at…** and retune to the new dial.
 9. Type the exact dial into **Dial you used** (or press **From radio**), then keep
-   your hands off the dial.
+   your hands off the dial. The **Live readings** card shows the readings as they
+   arrive, with a live answer and a chart; amber warnings there tell you at once if
+   readings stop or the tone is far from 1500 Hz.
 10. At one minute to go, 30 seconds, the 5-second countdown and "key down", the
     prompts are the same as on test night. Let WSJT-X measure for the whole minute.
 11. When the voice says the minute is over, import the file yourself. Press
@@ -280,8 +285,8 @@ signal is usually very strong. The app accepts frequencies from 500 kHz to 30 MH
     readings chart and table appear below, just like on the Run analysis tab. Only
     the readings inside the measuring minute are used, and the first and last
     are dropped.
-13. Press **Restart practice** to go again (delete fmt.all again first). The previous practice file is kept,
-    renamed, in the session folder.
+13. Press **Restart practice** to go again, with **Start a fresh fmt.all** still
+    ticked. The previous practice file is kept, renamed, in the session folder.
 
 **How to judge the result:**
 
@@ -315,7 +320,7 @@ still come out within a fraction of a hertz of 5,000,000.00 Hz.
 ## Test night, step by step
 
 Have WSJT-X and FMT Assistant side by side. Keep the **Test night** tab open; the
-blue banner under the clock always says what to do now and offers the button
+banner under the clock always says what to do now and offers the button
 you'll need.
 
 **Print the [operator checklist](https://va3mw.github.io/FMTAssistant/checklist.html)**
@@ -340,7 +345,10 @@ The voice says *"Twenty minutes to the first run. Start the before calibration�
    calibration cycle**. WSJT-X steps through its WWV list by itself.
 2. In FMT Assistant, watch the **WSJT-X fmt.all (live)** panel on the right. It should
    say *Measuring* with a growing count of readings. If it stays at *No fmt.all yet*,
-   the Measure box isn't checked or the log folder is wrong.
+   the Measure box isn't checked or the log folder is wrong. The calibration card
+   also shows a **Live preview**: one small chart per WWV station as WSJT-X steps
+   through them, with the fit worked out as it goes. An amber warning means a
+   station is far off or jumping.
    - If `fmt.all` has old readings from an earlier day, press **Start a fresh fmt.all**
      *before* you begin.
 3. Let it run several full cycles.
@@ -379,7 +387,12 @@ dial frequency into "Dial you used"**. You can type it in kHz (`7062.500`), MHz
 **30 seconds before key-down:** hands off the dial. Don't touch it until the carrier ends.
 
 **Key-down** (beep, *"Key down. Measuring."*): the banner turns red and counts down
-the minute. WSJT-X makes a reading about every six seconds.
+the minute. WSJT-X makes a reading about every six seconds. The run card's **Live
+preview** (it appears from call-up) shows the readings arriving, the running mean
+and a live carrier, with a chart of every reading. You want readings arriving, a
+steady chart and no amber warnings; see
+[Live readings and the stability chart](#live-readings-and-the-stability-chart).
+The live carrier is a preview: the answer comes from Capture.
 
 **Carrier ends** (beep, *"Carrier ended. Press Capture…"*):
 
@@ -430,9 +443,10 @@ By default the app uses the **average** of before and after (see the Calibration
 | **Flex** pill | Shows Flex off, Flex not connected, or the radio, slice, frequency and mode. Click it to go to Setup. |
 | **Problems** pill | The number of errors that stop a result being Ready. Click it for Results. |
 
-The **blue banner** below says what to do now. It turns **amber** during a call-up
+The **banner** below says what to do now (blue, or dark blue in dark mode). It turns **amber** during a call-up
 (with the dial to set and a Set radio button for Flex), **red** during key-down
-(with the seconds left), and offers **Capture** when a carrier has just ended.
+(with the seconds left), and offers **Capture** when a carrier has just ended. Before a calibration, it offers
+that calibration's **Capture** button from 45 minutes ahead.
 
 ### Test night tab
 
@@ -587,7 +601,7 @@ messages are warnings worth a look. **Blue** messages are information.
 | *WSJT-X has a calibration applied* | WSJT-X Settings > Frequencies has a non-zero intercept or slope, so the radio isn't where WSJT-X says it is. | Set both to 0 in WSJT-X, retune, and measure again. |
 | *WSJT-X log folder not found* | The folder in Setup doesn't exist. | In WSJT-X use File > Open log directory, then choose that folder in Setup. |
 | *There is no fmt.all* / *has no measurements* (on Capture) | WSJT-X hasn't written anything. | Check the **Measure** box and that the log folder is right. |
-| *Enter the exact dial frequency* | The run has no dial entry. | Type the dial you used. |
+| *Enter the exact dial frequency* | The run has a file but no dial entry. (Before a run has a file, a missing dial is only a blue reminder.) | Type the dial you used. |
 | *The dial … does not match the file* | WSJT-X logs the station's kHz, so only a 1 kHz range of dials is possible. Yours is outside it, which usually means a typo (7062.152 for 7062.512). | Correct the dial entry. |
 | *This file was measured near X kHz but … is near Y kHz* | The file belongs to a different station. | Load the correct file into this run; the message suggests which run the file belongs to. |
 | *…looks like a calibration file, not a test run* | The run file was measured on a WWV frequency. | Load the correct run file. |
@@ -595,7 +609,7 @@ messages are warnings worth a look. **Blue** messages are information.
 | *… have the same file loaded* | One file is in two slots. | Capture or load the right file for each slot. |
 | *… readings fall in the … time slot* | The file also holds another run's readings, usually because Capture wasn't pressed between runs. | Check on the Run analysis tab that the highlighted carrier is the right one; override readings if needed. |
 | *The carrier found … is outside the scheduled key-down time* | The strongest stretch of signal isn't at the scheduled time. Stations sometimes start late; this can also mean the wrong file. | Check the chart and readings; fix the schedule if it was wrong. |
-| *other long stretch(es) of strong signal* | Something else in the file also looks like a carrier, often a steady part of the CW ID. | Check the green readings are the key-down minute. |
+| *other long stretch(es) of strong signal* | Something else in the file also looks like a carrier, often a steady part of the CW ID. | Check that the readings used (filled dots on the chart, green rows in the table) are the key-down minute. |
 | *The dial was moved during the carrier* / *radio's dial changed during the carrier* | Readings came from more than one dial setting. | Drop the readings from before or after the change, so only one dial setting is used. |
 | *The radio's dial during the carrier was X, but you entered Y* | (Flex) The typed dial differs from the radio. | Correct the entry, or press **From radio**. |
 | *Only N reading(s) used* / *Readings scatter by …* | A weak or disturbed carrier. | Look at the readings. The answer may still be fine, but it's less certain. |

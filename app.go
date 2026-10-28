@@ -351,8 +351,12 @@ func (a *App) runView(r *session.Run, practice bool, before, after *fmtdata.CalR
 	} else if err == nil {
 		rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "info", Msg: "No file yet. After the carrier ends, press Capture (or Load to pick a saved file)."})
 	}
-	if r.DialHz == 0 {
+	// A missing dial only becomes a problem once there is a file to work out;
+	// before that it is just the next thing to do.
+	if r.DialHz == 0 && f != nil {
 		rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "error", Msg: "Enter the exact dial frequency you used for this run."})
+	} else if r.DialHz == 0 {
+		rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "info", Msg: "Type the exact dial into Dial you used once you've centred the tone, about two minutes before key-down."})
 	}
 	rv.Ready = rv.FinalHz != nil && !fmtdata.HasErrors(rv.Issues) && !fmtdata.HasErrors(resIssues(rv.Result))
 	return rv, f

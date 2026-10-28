@@ -377,7 +377,7 @@ function banner(now, nx){
   }else if(nx){
     html=`Next: ${esc(nx.label)} at ${hhmm(nx.t)} UTC (${local(nx.t)} local)`;
     s = nx.slot && nx.slot.startsWith('cal') ? 'Calibration: mode FreqCal, Measure ON, Tools > Execute frequency calibration cycle on WWV.' : 'Clock runs from this PC; make sure Windows time is synchronised.';
-    if(nx.slot==='cal_before' || nx.slot==='cal_after') buttons+=`<button onclick="capture('${nx.slot}')">Capture ${nx.slot==='cal_before'?'before':'after'} calibration</button>`;
+    if((nx.slot==='cal_before' || nx.slot==='cal_after') && nx.t-now<45*60e3) buttons+=`<button onclick="capture('${nx.slot}')">Capture ${nx.slot==='cal_before'?'before':'after'} calibration</button>`;
   }else{
     html='All scheduled events are past.'; s='Check the Results tab, then submit at fmt.arrl.org.';
   }
@@ -521,9 +521,15 @@ function runCard(rv, idx){
 
 function renderTimeline(){
   if(!S.runs.length) return;
+  const fresh=!S.session.callsign && !S.cals.some(c=>c.present) && !S.runs.some(r=>r.present) && !S.practice.present;
+  const intro=fresh? `<div class="card" style="border-color:var(--accent)"><h2>New here? Start in Setup &amp; radio</h2>
+    <div class="hint" style="font-size:13px">Enter your callsign, check the WSJT-X log folder and test the voice there, then rehearse on the <b>Practice</b> tab
+    (in a session of its own). This tab is for test night: one card per step, in order. This note goes away once you've entered your callsign.</div>
+    <div class="row" style="margin-top:8px"><button class="primary" onclick="showTab('setup')">Open Setup &amp; radio</button>
+    <button onclick="openURL('https://va3mw.github.io/FMTAssistant/checklist.html')">Printable checklist</button></div></div>` : '';
   const first=S.runs[0].call_up, last=S.runs[S.runs.length-1].key_up;
   const b=new Date(new Date(first).getTime()-20*60e3), a=new Date(new Date(last).getTime()+60e3);
-  let h=calCard(S.cals[0], `About 20 minutes before the first run (≈${hhmm(b)}Z). WWV, mode FreqCal, Measure on, Tools > Execute frequency calibration cycle, several cycles.`);
+  let h=intro+calCard(S.cals[0], `About 20 minutes before the first run (≈${hhmm(b)}Z). WWV, mode FreqCal, Measure on, Tools > Execute frequency calibration cycle, several cycles.`);
   S.runs.forEach((rv,i)=>h+=runCard(rv,i));
   h+=calCard(S.cals[1], `After the last run (≈${hhmm(a)}Z). Same procedure; comparing before and after shows drift.`);
   put('timeline', h);
@@ -965,11 +971,9 @@ function renderPractice(){
     carrier sits on a round frequency (a multiple of 10 kHz in the Americas, 9 kHz elsewhere). That lets you rehearse the whole
     test-night routine whenever you like: set the dial, centre the tone, type the dial, measure for one minute, capture, and read the answer.</p>
     <ol class="steps">
-      <li>Delete the old <b>fmt.all</b> first (in WSJT-X, <b>File &gt; Open log directory</b>), so earlier readings can't mix in.
-      Ticking <b>Start a fresh fmt.all</b> does the same by renaming it, as long as Setup points at that folder.</li>
       <li>Type the station's frequency in kHz (for example 1010), or pick WWV.</li>
-      <li>Choose how long you need to get ready, then press <b>Start practice</b>. The app counts down to a one-minute
-      measuring window with the same voice prompts as test night.</li>
+      <li>Choose how long you need to get ready, leave <b>Start a fresh fmt.all</b> ticked so earlier readings can't mix in,
+      then press <b>Start practice</b>. The app counts down to a one-minute measuring window with the same voice prompts as test night.</li>
       <li>In WSJT-X: <b>Mode &gt; FreqCal</b>, calibration cycle <b>off</b>, <b>Measure</b> on. Set <b>USB</b> (DIGU on a Flex) to the dial shown.</li>
       <li>Centre the tone near 1500 Hz (press <b>Tone is at…</b> if it isn't), type the exact dial, then keep your hands off the dial.</li>
       <li>When the minute is over, import the file yourself: press <b>Capture fmt.all</b>, or <b>Load file…</b> to pick fmt.all by hand.
@@ -977,6 +981,7 @@ function renderPractice(){
     </ol>
     <div class="hint">The radio must receive the AM broadcast band; most HF transceivers and all FlexRadio 6000 models do.
     Run a WWV calibration first (Test night tab) if you want the answer corrected for your radio's error. Without one, the practice answer is uncorrected.</div>
+    ${issuesHTML([{level:/practi[cs]e|rehears/i.test(S.session.name)?'info':'warn', msg:`Rehearse in a session of its own (Setup & radio > New session…, for example "Practice"), so a rehearsal calibration doesn't end up in your test-night session. Before the test, switch back with Open session…. This session is "${S.session.name}".`}])}
   </div>
   <div class="card"><h2>How to judge the result</h2>
     <ul class="steps">
