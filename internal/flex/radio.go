@@ -34,6 +34,27 @@ type Station struct {
 	Name     string `json:"name"`
 }
 
+// Reference is the radio's 10 MHz frequency reference, from the
+// "radio oscillator" and "gps" status. It is read only; the app never
+// changes the radio's reference.
+type Reference struct {
+	Known    bool   `json:"known"`   // an oscillator status has been received
+	Setting  string `json:"setting"` // what the user chose: auto, tcxo, gpsdo, external
+	State    string `json:"state"`   // the reference in use (auto falls back by itself)
+	Locked   bool   `json:"locked"`
+	TCXO     bool   `json:"tcxo_present"`
+	GPSDO    bool   `json:"gpsdo_present"`
+	External bool   `json:"ext_present"`
+	GNSS     bool   `json:"gnss_present"`
+	// GPS receiver status, when the radio has one. FreqError is shown as the
+	// radio reports it: its units and sign are not documented.
+	GPSStatus    string    `json:"gps_status"`
+	GPSFix       string    `json:"gps_fix"`
+	GPSFreqError string    `json:"gps_freq_error"`
+	GPSTime      string    `json:"gps_time"`
+	GPSTimeAt    time.Time `json:"gps_time_at"` // when GPSTime was received
+}
+
 // Snapshot is a consistent copy of the radio state.
 type Snapshot struct {
 	Connected    bool      `json:"connected"`
@@ -44,6 +65,7 @@ type Snapshot struct {
 	BoundStation string    `json:"bound_station"`
 	BoundHandle  uint32    `json:"bound_handle"`
 	Slices       []Slice   `json:"slices"`
+	Ref          Reference `json:"ref"`
 }
 
 // SliceByLetter finds an in-use slice owned by the bound station.
@@ -70,6 +92,9 @@ type Radio struct {
 
 	// OnSliceFreq (optional) is told about every slice frequency change.
 	OnSliceFreq func(letter string, hz int64)
+	// OnReference (optional) is told when the reference in use or its lock
+	// state changes.
+	OnReference func(Reference)
 
 	mu          sync.Mutex
 	conn        net.Conn
@@ -84,6 +109,7 @@ type Radio struct {
 	wantStation string
 	boundHandle uint32
 	boundName   string
+	ref         Reference
 	lastRx      time.Time
 	stop        chan struct{}
 }
@@ -165,6 +191,7 @@ func (r *Radio) session(ip string, stop chan struct{}) error {
 	r.slices = map[int]*Slice{}
 	r.stations = map[uint32]*Station{}
 	r.boundHandle, r.boundName, r.myHandle = 0, "", 0
+	r.ref = Reference{}
 	r.lastRx = time.Now()
 	r.mu.Unlock()
 
@@ -176,7 +203,12 @@ func (r *Radio) session(ip string, stop chan struct{}) error {
 		r.connected = false
 		r.conn = nil
 		r.boundHandle, r.boundName = 0, ""
+		hadRef, cb := r.ref.Known, r.OnReference
+		r.ref = Reference{}
 		r.mu.Unlock()
+		if hadRef && cb != nil {
+			cb(Reference{}) // no longer known
+		}
 		r.notify()
 	}()
 
@@ -237,6 +269,8 @@ func (r *Radio) handleLine(line string) {
 		for _, s := range []string{"sub client all", "sub slice all", "sub radio all"} {
 			r.Command(s, nil)
 		}
+		// GPS status is only for display; a radio without GPS may refuse it.
+		r.Command("sub gps all", func(uint32, string) {})
 		r.Command("info", r.onInfo)
 		r.notify()
 	case 'R':
@@ -367,6 +401,10 @@ func (r *Radio) handleStatus(body string) bool {
 		r.applyClient(uint32(h), fields[2], ParseKV(strings.Join(fields[3:], " ")))
 		return true
 	case "radio":
+		if len(fields) >= 2 && fields[1] == "oscillator" {
+			r.applyOscillator(ParseKV(strings.Join(fields[2:], " ")))
+			return true
+		}
 		if len(fields) < 2 || !strings.Contains(fields[1], "=") {
 			return false
 		}
@@ -377,8 +415,70 @@ func (r *Radio) handleStatus(body string) bool {
 		}
 		r.mu.Unlock()
 		return true
+	case "gps":
+		// gps lat=..#lon=..#freq_error=..#status=..#time=..; values may hold spaces.
+		r.applyGPS(strings.TrimSpace(strings.TrimPrefix(body, "gps")))
+		return true
 	}
 	return false
+}
+
+// applyOscillator reads "radio oscillator state=gpsdo setting=auto locked=1
+// ext_present=0 gpsdo_present=1 tcxo_present=1 [gnss_present=0]".
+func (r *Radio) applyOscillator(kv map[string]string) {
+	r.mu.Lock()
+	old := r.ref
+	ref := &r.ref
+	ref.Known = true
+	for k, v := range kv {
+		switch k {
+		case "state":
+			ref.State = strings.ToLower(v)
+		case "setting":
+			ref.Setting = strings.ToLower(v)
+		case "locked":
+			ref.Locked = v == "1"
+		case "tcxo_present":
+			ref.TCXO = v == "1"
+		case "gpsdo_present":
+			ref.GPSDO = v == "1"
+		case "ext_present":
+			ref.External = v == "1"
+		case "gnss_present":
+			ref.GNSS = v == "1"
+		}
+	}
+	now, cb := r.ref, r.OnReference
+	r.mu.Unlock()
+	if now.State != old.State || now.Locked != old.Locked || now.Setting != old.Setting || !old.Known {
+		r.log.Info("reference: setting %s, using %s, locked %v (tcxo %v gpsdo %v ext %v gnss %v)",
+			now.Setting, now.State, now.Locked, now.TCXO, now.GPSDO, now.External, now.GNSS)
+		if cb != nil {
+			cb(now)
+		}
+	}
+}
+
+func (r *Radio) applyGPS(s string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, kv := range strings.Split(s, "#") {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok {
+			continue
+		}
+		v = unescape(strings.TrimSpace(v))
+		switch strings.ToLower(strings.TrimSpace(k)) {
+		case "freq_error":
+			r.ref.GPSFreqError = v
+		case "status":
+			r.ref.GPSStatus = v
+		case "fix":
+			r.ref.GPSFix = v
+		case "time":
+			r.ref.GPSTime, r.ref.GPSTimeAt = v, time.Now()
+		}
+	}
 }
 
 func (r *Radio) applySlice(idx int, kv map[string]string) {
@@ -511,6 +611,7 @@ func (r *Radio) Snapshot() Snapshot {
 		Nickname:     r.nickname,
 		BoundStation: r.boundName,
 		BoundHandle:  r.boundHandle,
+		Ref:          r.ref,
 	}
 	for _, st := range r.stations {
 		if st.ClientID != "" && st.Name != "" {

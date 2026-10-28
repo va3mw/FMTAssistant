@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,11 +37,14 @@ type App struct {
 	sess   *session.Session
 	notice string // shown in Setup, e.g. why sessions aren't in Documents
 	cache  map[string]cached
+	ready  chan struct{} // closed when startup has loaded the session
 
 	disc  *flex.Discovery
 	radio *flex.Radio
 	// dial history of the controlled slice, to check the dial during a carrier
 	freqLog []freqEntry
+	// changes of the radio's frequency reference (reference.go)
+	refLog []refEntry
 
 	// live follow of fmt.all (live.go); liveMu is taken before mu, never after
 	liveMu sync.Mutex
@@ -60,7 +64,7 @@ type freqEntry struct {
 }
 
 func NewApp(l *logx.Logger) *App {
-	return &App{log: l, src: l.Src("app"), cache: map[string]cached{}}
+	return &App{log: l, src: l.Src("app"), cache: map[string]cached{}, ready: make(chan struct{})}
 }
 
 func (a *App) startup(ctx context.Context) {
@@ -68,6 +72,7 @@ func (a *App) startup(ctx context.Context) {
 	a.voice = speech.New(a.log)
 	a.radio = flex.NewRadio(a.log, a.changed)
 	a.radio.OnSliceFreq = a.onSliceFreq
+	a.radio.OnReference = a.onReference
 	a.disc = flex.NewDiscovery(a.log, a.changed)
 
 	dir := loadLastDir()
@@ -103,6 +108,7 @@ func (a *App) startup(ctx context.Context) {
 	a.saveLocked()
 	a.src.Info("session %q in %s", s.Name, s.Dir())
 	a.startFlexLocked()
+	close(a.ready)
 }
 
 func (a *App) shutdown(context.Context) {
@@ -180,27 +186,39 @@ type FlexView struct {
 }
 
 type State struct {
-	Session  *session.Session `json:"session"`
-	Dir      string           `json:"dir"`
-	WSJTX    WSJTXView        `json:"wsjtx"`
-	Cals     []CalView        `json:"cals"`
-	Runs     []RunView        `json:"runs"`
-	Practice RunView          `json:"practice"`
-	Flex     FlexView         `json:"flex"`
-	VoiceOK  bool             `json:"voice_ok"`
-	Problems int              `json:"problems"`
-	Notice   string           `json:"notice"`
-	Version  string           `json:"version"`
+	Session  *session.Session  `json:"session"`
+	Dir      string            `json:"dir"`
+	WSJTX    WSJTXView         `json:"wsjtx"`
+	Cals     []CalView         `json:"cals"`
+	Runs     []RunView         `json:"runs"`
+	Practice RunView           `json:"practice"`
+	Flex     FlexView          `json:"flex"`
+	Ref      session.RefRecord `json:"ref"` // the frequency reference now
+	VoiceOK  bool              `json:"voice_ok"`
+	Problems int               `json:"problems"`
+	Notice   string            `json:"notice"`
+	Version  string            `json:"version"`
 }
 
 // GetState analyses everything and returns it for display.
 func (a *App) GetState() State {
+	// The window can ask before startup has loaded the session.
+	<-a.ready
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	// Wails drops a call whose method panics without answering it, which
+	// would leave the UI waiting forever; log the stack and re-panic.
+	defer func() {
+		if r := recover(); r != nil {
+			a.src.Error("GetState panic: %v\n%s", r, debug.Stack())
+			panic(r)
+		}
+	}()
 	s := a.sess
 	st := State{Session: s, Dir: s.Dir(), VoiceOK: a.voice.OK(), Version: version, Notice: a.notice}
 	st.WSJTX = a.wsjtxView()
 	st.Flex = a.flexView()
+	st.Ref = a.currentRefLocked()
 
 	// Calibration files.
 	files := map[string]*fmtdata.File{}
@@ -214,6 +232,7 @@ func (a *App) GetState() State {
 			files[c.ID] = f
 			cv.Lines = f.Lines
 			cv.Result = fmtdata.AnalyzeCal(f, fmtdata.CalOptions{MinSNR: c.MinSNR, Stations: c.Stations})
+			cv.Issues = append(cv.Issues, refCalIssues(c.Slot.Ref, cv.Result)...)
 			ref := 0
 			for _, l := range f.Lines {
 				if _, ok := fmtdata.LookupReference(l.KHz); ok {
@@ -227,6 +246,11 @@ func (a *App) GetState() State {
 		st.Cals = append(st.Cals, cv)
 	}
 	before, after := st.Cals[0].Result, st.Cals[1].Result
+	if rb, ra := s.CalBefore.Slot.Ref, s.CalAfter.Slot.Ref; rb != nil && ra != nil && rb.Kind != ra.Kind {
+		st.Cals[1].Issues = append(st.Cals[1].Issues, fmtdata.Issue{Level: "warn", Msg: fmt.Sprintf(
+			"The before and after calibrations were made on different references (%s, then %s). Don't average them: choose the one made on the same reference as the runs.",
+			refKindName(rb.Kind), refKindName(ra.Kind))})
+	}
 
 	// Runs.
 	for i := range s.Runs {
@@ -333,6 +357,14 @@ func (a *App) runView(r *session.Run, practice bool, before, after *fmtdata.CalR
 			default:
 				rv.CorrHz = &corr
 			}
+			used := map[string]*session.RefRecord{}
+			if rv.CorrBefore != nil && (s.CalMode == "before" || s.CalMode == "average") {
+				used["before"] = s.CalBefore.Slot.Ref
+			}
+			if rv.CorrAfter != nil && (s.CalMode == "after" || s.CalMode == "average") {
+				used["after"] = s.CalAfter.Slot.Ref
+			}
+			rv.Issues = append(rv.Issues, refRunIssues(r.Slot.Ref, s.CalMode, used)...)
 			if rv.CorrBefore != nil && rv.CorrAfter != nil && math.Abs(*rv.CorrBefore-*rv.CorrAfter) > 0.3 {
 				rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "warn", Msg: fmt.Sprintf(
 					"The before and after calibrations differ by %.2f Hz here, so the radio drifted. Averaging them is usually best.",
@@ -596,6 +628,7 @@ func (a *App) CaptureSlot(id string, force bool) (string, error) {
 	if err := a.storeLocked(id, sl, src); err != nil {
 		return "", err
 	}
+	a.recordRefLocked(sl, f)
 	bak := filepath.Join(a.sess.WSJTXDir, fmt.Sprintf("fmt-%s-%s.bak", id, time.Now().UTC().Format("20060102-150405")))
 	if err := os.Rename(src, bak); err != nil {
 		a.src.Warn("captured, but could not rename fmt.all: %v", err)
@@ -996,6 +1029,7 @@ func (a *App) NewSession(name string) (string, error) {
 	s.Name, s.Callsign, s.WSJTXDir, s.Flex = name, old.Callsign, old.WSJTXDir, old.Flex
 	s.Voice, s.Volume, s.Beeps, s.CalMode = old.Voice, old.Volume, old.Beeps, old.CalMode
 	s.AutoCapture = old.AutoCapture
+	s.Reference, s.ExtDisciplined = old.Reference, old.ExtDisciplined
 	// Keep the schedule the operator may have edited.
 	for i := range s.Runs {
 		if i < len(old.Runs) {
@@ -1071,6 +1105,7 @@ func (a *App) Report() (string, error) {
 		cr := c.Result
 		fmt.Fprintf(&b, "  %s (%s-%s UTC, file %s)\n", c.Title, cr.First, cr.Last, c.Cal.Slot.File)
 		fmt.Fprintf(&b, "    Slope %.4f +/- %.4f ppm, Intercept %.3f +/- %.3f Hz, N %d, StdDev %.3f Hz\n", cr.B, cr.SigmaB, cr.A, cr.SigmaA, cr.NFit, cr.RMS)
+		fmt.Fprintf(&b, "    Reference: %s\n", refReportLine(c.Cal.Slot.Ref))
 		for _, stn := range cr.Stations {
 			use := "used"
 			if !stn.Included {
@@ -1092,6 +1127,7 @@ func (a *App) Report() (string, error) {
 			if r.FinalHz != nil {
 				fmt.Fprintf(&b, "    Carrier = dial + fMeas - correction = %.2f Hz\n", *r.FinalHz)
 			}
+			fmt.Fprintf(&b, "    Reference: %s\n", refReportLine(r.Run.Slot.Ref))
 		}
 		for _, is := range append(append([]fmtdata.Issue{}, r.Issues...), resIssues(r.Result)...) {
 			if is.Level != "info" {
@@ -1134,6 +1170,9 @@ func (a *App) SetFlexEnabled(on bool) {
 	a.mu.Lock()
 	was := a.sess.Flex.Enabled
 	a.sess.Flex.Enabled = on
+	if was && !on {
+		a.logRefLocked(flex.Reference{}) // Setup's reference applies from now
+	}
 	a.saveLocked()
 	a.mu.Unlock()
 	if on && !was {
@@ -1242,6 +1281,7 @@ func (a *App) flexView() FlexView {
 	}
 	v.Radios = a.disc.List()
 	v.Snap = a.radio.Snapshot()
+	v.Issues = append(v.Issues, flexRefIssues(v.Snap.Ref, a.sess.ExtDisciplined, time.Now())...)
 	if sl, ok := v.Snap.SliceByLetter(a.sess.Flex.Slice); ok {
 		v.Slice = &sl
 		if sl.Mode != "DIGU" {

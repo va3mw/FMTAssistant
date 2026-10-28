@@ -53,6 +53,25 @@ type Slot struct {
 	File       string `json:"file"`        // name inside the session folder
 	Source     string `json:"source"`      // where it came from
 	CapturedAt string `json:"captured_at"` // UTC, RFC 3339
+	// Ref is the frequency reference the radio was on while the file was
+	// measured, recorded at Capture. Nil for loaded files and older sessions.
+	Ref *RefRecord `json:"ref,omitempty"`
+}
+
+// Reference kinds.
+const (
+	RefInternal = "internal" // the radio's own TCXO/OCXO
+	RefExternal = "external" // an external 10 MHz of unknown accuracy
+	RefGPS      = "gps"      // GPS-disciplined: a GPSDO/GNSS, or an external GPS-locked or rubidium 10 MHz
+)
+
+// RefRecord is the frequency reference over one measurement.
+type RefRecord struct {
+	Kind    string `json:"kind"`    // RefInternal, RefExternal or RefGPS
+	Locked  bool   `json:"locked"`  // locked for the whole measurement (always true when declared in Setup)
+	Changed bool   `json:"changed"` // the reference in use changed during the measurement
+	From    string `json:"from"`    // "radio" (read from a FlexRadio) or "setup" (declared by the operator)
+	Detail  string `json:"detail"`  // e.g. "GPSDO, locked, GPS freq_error 0.12"
 }
 
 type Flex struct {
@@ -84,6 +103,13 @@ type Session struct {
 	// AutoCapture captures fmt.all one minute after each key-up when the
 	// slot is still empty. Off by default.
 	AutoCapture bool `json:"auto_capture"`
+	// Reference is the radio's frequency reference as declared by the
+	// operator (RefInternal, RefExternal or RefGPS). A connected FlexRadio
+	// reports its own, which takes precedence.
+	Reference string `json:"reference"`
+	// ExtDisciplined says an external 10 MHz reference is GPS-disciplined or
+	// rubidium, so it counts as RefGPS.
+	ExtDisciplined bool `json:"ext_disciplined"`
 
 	dir string
 }
@@ -111,10 +137,11 @@ func Default() *Session {
 		},
 		Practice: Run{ID: "practice", Station: "Practice", NominalKHz: 1010, CarrierHz: 1010e3,
 			MinSNR: 20, TrimEdges: true},
-		CalMode: "average",
-		Voice:   true,
-		Volume:  100,
-		Beeps:   true,
+		CalMode:   "average",
+		Reference: RefInternal,
+		Voice:     true,
+		Volume:    100,
+		Beeps:     true,
 	}
 }
 

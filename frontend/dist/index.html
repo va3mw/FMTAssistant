@@ -443,7 +443,7 @@ function render(){
   const vp=document.getElementById('voicePill'); vp.textContent=S.session.voice?'Voice on':'Voice off'; vp.className='pill'+(S.session.voice?' ok':'');
   const fp=document.getElementById('flexPill'), f=S.flex;
   if(!f.enabled){ fp.textContent='Flex off'; fp.className='pill' }
-  else if(f.snap.connected){ fp.textContent=(f.snap.nickname||f.snap.model||'Flex')+(f.slice?` · ${f.slice.letter} ${fmtKHz(f.slice.freq_hz)} ${f.slice.mode}`:' · no slice'); fp.className='pill ok' }
+  else if(f.snap.connected){ fp.textContent=(f.snap.nickname||f.snap.model||'Flex')+(f.slice?` · ${f.slice.letter} ${fmtKHz(f.slice.freq_hz)} ${f.slice.mode}`:' · no slice')+refPill(f.snap.ref); fp.className='pill '+(refBad(f.snap.ref)?'bad':'ok') }
   else { fp.textContent='Flex not connected'; fp.className='pill bad' }
   if(S.notice && !window._noticeShown){ window._noticeShown=true; toast('Sessions are not in Documents. See Setup & radio for why.') }
   const pp=document.getElementById('probPill'); pp.textContent=S.problems? S.problems+' problem'+(S.problems>1?'s':''):'No problems'; pp.className='pill '+(S.problems?'bad':'ok');
@@ -469,6 +469,16 @@ function statusChip(ok, present, issues){
   return '<span class="status warn">Check</span>';
 }
 
+// refPill is the reference for the Flex pill, e.g. " · GPSDO locked".
+function refPill(r){
+  if(!r||!r.known) return '';
+  const n={tcxo:'TCXO', gpsdo:'GPSDO', external:'Ext 10 MHz'}[r.state]||r.state;
+  if(r.setting && r.setting!=='auto' && r.setting!==r.state) return ` · ${n} (${({gpsdo:'GPSDO', external:'Ext 10 MHz', tcxo:'TCXO'})[r.setting]} lost!)`;
+  return ' · '+n+(r.state==='tcxo'?'':(r.locked?' locked':' NOT locked'));
+}
+function refBad(r){ return r&&r.known&&((r.setting&&r.setting!=='auto'&&r.setting!==r.state)||(r.state!=='tcxo'&&!r.locked)) }
+// refLine shows the reference recorded with a captured file.
+function refLine(rec){ return rec? `<b>Reference</b><span>${esc(rec.detail)}${rec.from==='setup'?' <span class="hint">(as set in Setup)</span>':''}</span>` : '' }
 function calCard(c, when){
   const r=c.result, issues=[...(c.issues||[]), ...((r&&r.issues)||[])];
   return `<div class="card ${r&&r.ok&&!errCount(issues)?'done':''}">
@@ -477,7 +487,8 @@ function calCard(c, when){
     ${r&&r.ok? `<div class="kv" style="margin-top:8px"><b>Slope</b><span class="mono">${r.b.toFixed(4)} ± ${r.sigma_b.toFixed(4)} ppm</span>
       <b>Intercept</b><span class="mono">${r.a.toFixed(3)} ± ${r.sigma_a.toFixed(3)} Hz</span>
       <b>Stations / StdDev</b><span class="mono">${r.n_fit} / ${r.rms.toFixed(3)} Hz</span>
-      <b>Readings</b><span>${r.used} used of ${r.total} (${r.first}-${r.last} UTC)</span></div>`:''}
+      <b>Readings</b><span>${r.used} used of ${r.total} (${r.first}-${r.last} UTC)</span>
+      ${refLine(c.cal.slot.ref)}</div>`:''}
     <div class="row" style="margin-top:10px">${slotButtons(c.id, c.present)}<button onclick="showTab('cal')">Details</button></div>
     ${L.step===c.id? calLiveBlock(c):''}
     ${issuesHTML(issues)}
@@ -510,6 +521,7 @@ function runCard(rv, idx){
           <b>Mean fMeas</b><span class="mono">${res&&res.n? res.mean_fmeas.toFixed(3)+' Hz (n='+res.n+', sd '+res.sd.toFixed(2)+')':'-'}</span>
           <b>Correction</b><span class="mono">${rv.corr_hz!=null? (rv.corr_hz>=0?'+':'')+rv.corr_hz.toFixed(3)+' Hz':'-'}</span>
           <b>Carrier</b><span class="answer ${rv.ready?'ok':''}">${rv.final_hz!=null? fmtHz(rv.final_hz):'-'}</span>
+          ${refLine(r.slot.ref)}
         </div>
       </div>
     </div>
@@ -561,9 +573,11 @@ async function clearFmt(){ if(confirm('Rename the current fmt.all so WSJT-X star
 function renderCal(){
   const mode=S.session.cal_mode;
   let h=`<div class="card"><h2>Which calibration to apply</h2><div class="row">
-    ${[['average','Average of before and after (recommended)'],['before','Before only'],['after','After only'],['none','No correction (GPS-locked radio)']].map(([v,l])=>
+    ${[['average','Average of before and after (recommended)'],['before','Before only'],['after','After only'],['none','No correction (GPS-locked reference only)']].map(([v,l])=>
       `<label class="chk"><input type="radio" name="calmode" ${mode===v?'checked':''} onchange="call('SetCalMode','${v}')"> ${l}</label>`).join('')}
-    </div><div class="hint" style="margin-top:6px">Correction at frequency f (MHz) is A + B×f. Carrier = dial + mean fMeas − correction.</div></div>`;
+    </div><div class="hint" style="margin-top:6px">Correction at frequency f (MHz) is A + B×f. Carrier = dial + mean fMeas − correction.
+    Frequency reference now: <b>${esc(S.ref.detail)}</b>${S.ref.from==='setup'?' (as set in Setup &amp; radio)':' (read from the radio)'}.
+    A calibration only holds for the reference it was made on; the app records the reference with each file you capture.</div></div>`;
   for(const c of S.cals){
     const r=c.result;
     h+=`<div class="card"><div class="row"><h2 class="grow">${esc(c.title)}</h2>
@@ -1055,6 +1069,10 @@ function renderSetup(){
       <button onclick="browseDir()">Browse…</button></div>
     <div class="hint" style="margin-top:6px">${w.ini_found?`WSJT-X calibration in settings: intercept ${w.cal_a} Hz, slope ${w.cal_b} ppm ${(w.cal_a||w.cal_b)?'':'(good: zero)'}`:'WSJT-X.ini not found in this folder.'}</div>
     ${issuesHTML(w.issues)}</div>
+  <div class="card"><h2>Frequency reference</h2>
+    <div class="hint">What your radio's frequency comes from. It doesn't change the arithmetic (the WWV calibration measures the radio's whole error);
+    it decides which checks apply, and it's recorded with each file you capture.</div>
+    ${refSetup()}</div>
   <div class="card"><h2>Voice and sound</h2>
     <div class="row"><label class="chk"><input type="checkbox" ${s.voice?'checked':''} onchange="call('SetVoice',this.checked,${s.volume||100},${s.beeps})"> Voice prompts</label>
     <label class="chk"><input type="checkbox" ${s.beeps?'checked':''} onchange="call('SetVoice',${s.voice},${s.volume||100},this.checked)"> Beeps</label>
@@ -1079,6 +1097,25 @@ function renderSetup(){
     ${f.enabled? flexSetup(f):''}</div>
   </div></div>`;
   put('setupPanel', h);
+}
+function refSetup(){
+  const s=S.session, fr=S.flex.enabled&&S.flex.snap.connected? S.flex.snap.ref : null, fromRadio=fr&&fr.known;
+  const kinds=[['internal','Internal oscillator (TCXO or OCXO)'],['external','External 10 MHz reference'],['gps','GPS-disciplined (GPSDO, GNSS, or a GPS-locked or rubidium 10 MHz)']];
+  let h='';
+  if(fromRadio){
+    const yes=b=>b?'yes':'no';
+    h+=`<div class="kv" style="margin-top:8px"><b>From the radio</b><span><b>${esc(S.ref.detail)}</b></span>
+      <b>Selected / in use</b><span class="mono">${esc(fr.setting||'-')} / ${esc(fr.state||'-')}</span>
+      <b>Fitted</b><span>TCXO ${yes(fr.tcxo_present)} · GPSDO ${yes(fr.gpsdo_present)} · GNSS ${yes(fr.gnss_present)} · external ${yes(fr.ext_present)}</span>
+      ${fr.gps_status||fr.gps_freq_error?`<b>GPS</b><span>${esc(fr.gps_status||'-')}${fr.gps_fix?' · fix '+esc(fr.gps_fix):''}${fr.gps_freq_error?' · freq_error '+esc(fr.gps_freq_error):''}</span>`:''}</div>
+      <div class="hint" style="margin-top:4px">The FlexRadio reports its reference, so the choice below isn't used while it's connected.
+      freq_error is shown as the radio reports it and is not applied: its units and sign aren't documented, and a locked GPSDO's error is far below 0.01 Hz anyway.</div>`;
+  }
+  h+=`<div style="margin-top:8px;${fromRadio?'opacity:.6':''}"><div class="hint">${fromRadio?'Without a FlexRadio':'Your radio’s reference'}:</div>
+    ${kinds.map(([v,l])=>`<label class="chk" style="display:flex;margin-top:3px"><input type="radio" name="refkind" ${(s.reference||'internal')===v?'checked':''} onchange="call('SetReference','${v}')"> ${l}</label>`).join('')}</div>
+    <label class="chk" style="margin-top:8px"><input type="checkbox" ${s.ext_disciplined?'checked':''} onchange="call('SetExtDisciplined',this.checked)"> My external 10 MHz is GPS-disciplined or rubidium</label>
+    <div class="hint">With an internal oscillator or an external 10 MHz of unknown accuracy, calibrate on WWV before and after. Only a GPS-locked reference makes <b>No correction</b> safe.</div>`;
+  return h;
 }
 function flexSetup(f){
   const s=S.session.flex, snap=f.snap;
@@ -1116,7 +1153,10 @@ async function openSession(){ try{ const p=await api().OpenSession(); if(p) toas
 let busy=false;
 async function refresh(){
   if(busy) return; busy=true;
-  try{ S=await api().GetState(); render() }catch(e){ console.error(e) } finally{ busy=false }
+  // A call that never answers (a Go panic is dropped by Wails) must not stop
+  // the refresh loop for good.
+  const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('GetState did not answer within 5 s')), 5000));
+  try{ S=await Promise.race([api().GetState(), timeout]); render() }catch(e){ console.error(e) } finally{ busy=false }
 }
 window.addEventListener('DOMContentLoaded', ()=>{
   showTab(safeGet('tab')||'night');
