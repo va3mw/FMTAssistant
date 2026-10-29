@@ -216,6 +216,7 @@ const api = () => window.go.main.App;
 let S = null;              // last state from Go
 let lastJSON = {};          // per-panel render cache
 let selRun = null;          // run shown in the analysis tab
+let reportText='', aiText=''; // report and AI prompt, shown on the Results tab once asked for
 const fired = new Set(JSON.parse(safeGet('fired') || '[]'));
 
 function safeGet(k){ try{ return localStorage.getItem(k) }catch(e){ return null } }
@@ -930,7 +931,8 @@ function renderResults(){
       <td>${statusChip(rv.ready, rv.present, [...(rv.issues||[]),...((rv.result&&rv.result.issues)||[])])}</td></tr>`).join('')}</table>
     <div class="row" style="margin-top:12px"><button class="primary" onclick="makeReport()">Save report &amp; show</button><button onclick="copyResults()">Copy results</button><button onclick="api().OpenSessionFolder()">Open session folder</button>
       <button onclick="openURL('https://fmt.arrl.org/fmtentry.php')">ARRL FMT data entry page ↗</button></div>
-    <div id="reportOut"></div></div>`;
+    <div id="reportOut">${reportText?'<pre class="report">'+esc(reportText)+'</pre>':''}</div></div>`;
+  h+=outcomeCard();
   const got=S.runs.filter(rv=>rv.result&&rv.result.lines&&rv.result.lines.length);
   if(got.length) h+=`<div class="card"><h2>Stability of each run</h2><div class="hint">fMeas through each captured file, as an offset from the mean of the readings used. A steady carrier stays within a few tenths of a hertz.</div>
     <div class="stgrid">${got.map(rv=>`<div><h4>${esc(rv.title)} <span class="hint" style="font-weight:400">${rv.result.n?'n='+rv.result.n+' · σ '+rv.result.sd.toFixed(3)+' Hz · σ/√N '+rv.result.sem.toFixed(3)+' Hz':''}</span></h4>${chart(rv.result, rv, {w:440, h:150, key:false})}</div>`).join('')}</div>
@@ -979,7 +981,39 @@ function renderAbout(){
   </div></div>`;
   put('aboutPanel', h);
 }
-async function makeReport(){ try{ const t=await api().Report(); lastJSON.resultsPanel=null; document.getElementById('reportOut').innerHTML='<pre class="report">'+esc(t)+'</pre>'; toast('Saved "FMT results.txt" in the session folder.') }catch(e){ toast(String(e),true) } }
+// outcomeCard compares each answer with the published frequency, once the
+// ARRL has published the results and they've been typed in.
+function outcomeCard(){
+  const modes=[['none','No correction'],['before','Before'],['after','After'],['average','Average']];
+  const errCell=(v,on)=>v==null?'<td class="n">-</td>':`<td class="n" style="${on?'font-weight:600':''}">${(v>=0?'+':'')+v.toFixed(3)}</td>`;
+  let h=`<div class="card"><h2>How close were you?</h2><div class="hint">When the ARRL publishes the results (${link('https://fmt.arrl.org/','fmt.arrl.org')}), type each station's published frequency here, in Hz or kHz.
+    The app shows how far off each answer was, what each correction choice would have given (the one your answer used is in bold), and what the errors suggest. It never changes your answers.</div>
+    <table style="margin-top:10px"><tr><th>Run</th><th>Published frequency</th><th class="n">Your answer</th><th class="n">Error, Hz</th><th class="n">ppb</th>${modes.map(m=>`<th class="n">${m[1]}</th>`).join('')}</tr>
+    ${S.runs.map(rv=>{ const o=rv.outcome, r=rv.run; return `<tr><td>${esc(rv.title)}</td>
+      <td><input class="num" style="width:150px" placeholder="e.g. 7062512.34" value="${esc(r.published_text||'')}" onchange="setPublished('${r.id}',this)"> <span class="hint">${r.published_hz?('= '+fmtHz(r.published_hz)):(r.published_text?'not a frequency':'')}</span></td>
+      <td class="n">${rv.final_hz!=null?fmtHz(rv.final_hz):'-'}</td>
+      ${o?`<td class="n"><b>${(o.err_hz>=0?'+':'')+o.err_hz.toFixed(3)}</b></td><td class="n">${(o.err_ppb>=0?'+':'')+o.err_ppb.toFixed(1)}</td>`:'<td class="n">-</td><td class="n">-</td>'}
+      ${modes.map(m=>{ const v=o&&o.by_mode[m[0]]!=null?o.by_mode[m[0]]:null; return errCell(v, v!=null&&Math.abs(v-o.err_hz)<1e-9) }).join('')}</tr>` }).join('')}</table>`;
+  if(S.outcome_notes&&S.outcome_notes.length) h+='<h3>What the errors suggest</h3><ul class="steps">'+S.outcome_notes.map(n=>`<li>${esc(n)}</li>`).join('')+'</ul>';
+  h+=`<h3>Ask an AI</h3><div class="hint">Builds a prompt with your method, frequency reference, calibrations, every run's readings and the published frequencies (if entered),
+    and asks for the likely causes of each error and what to change next time. Paste it into the AI chat of your choice. It's also saved as "FMT AI prompt.txt" in the session folder.</div>
+    <div class="row" style="margin-top:8px"><button class="primary" onclick="copyAIPrompt()">Copy AI prompt</button><button onclick="showAIPrompt()">${aiText?'Hide prompt':'Show prompt'}</button></div>
+    <div id="aiOut">${aiText?'<pre class="report">'+esc(aiText)+'</pre>':''}</div></div>`;
+  return h;
+}
+async function setPublished(id, el){
+  try{ const r=await api().SetPublished(id, el.value); el.nextElementSibling.textContent=r||'' }
+  catch(e){ el.nextElementSibling.textContent=String(e) }
+  refresh();
+}
+async function copyAIPrompt(){
+  try{ const t=await api().AIPrompt(); await window.runtime.ClipboardSetText(t); toast('Prompt copied, and saved as "FMT AI prompt.txt" in the session folder.') }catch(e){ toast(String(e),true) }
+}
+async function showAIPrompt(){
+  if(aiText){ aiText=''; renderResults(); return }
+  try{ aiText=await api().AIPrompt(); renderResults() }catch(e){ toast(String(e),true) }
+}
+async function makeReport(){ try{ reportText=await api().Report(); renderResults(); toast('Saved "FMT results.txt" in the session folder.') }catch(e){ toast(String(e),true) } }
 async function copyResults(){
   const t=S.runs.map(rv=>`${rv.title}: ${rv.final_hz!=null?rv.final_hz.toFixed(2)+' Hz':'n/a'}${rv.ready?'':' (check)'}`).join('\r\n');
   await window.runtime.ClipboardSetText(t); toast('Results copied.');

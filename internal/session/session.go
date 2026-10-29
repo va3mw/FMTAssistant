@@ -31,12 +31,17 @@ type Run struct {
 	// SliceErrMHz is the Flex slice's own tuning error (slice get_error, in
 	// millihertz), read at key-down on the dial SliceErrDialHz. The radio
 	// receives dial + error, so it's added to the dial. Nil when not read.
-	SliceErrMHz    *float64     `json:"slice_err_mhz,omitempty"`
-	SliceErrDialHz int64        `json:"slice_err_dial_hz,omitempty"`
-	Slot           Slot         `json:"slot"`
-	MinSNR         float64      `json:"min_snr"`
-	TrimEdges      bool         `json:"trim_edges"`
-	Overrides      map[int]bool `json:"overrides"`
+	SliceErrMHz    *float64 `json:"slice_err_mhz,omitempty"`
+	SliceErrDialHz int64    `json:"slice_err_dial_hz,omitempty"`
+	// PublishedHz is the carrier's true frequency as published by the ARRL
+	// after the test, typed in to see how close the answer was. 0 until
+	// entered; it never changes the answer.
+	PublishedText string       `json:"published_text,omitempty"`
+	PublishedHz   float64      `json:"published_hz,omitempty"`
+	Slot          Slot         `json:"slot"`
+	MinSNR        float64      `json:"min_snr"`
+	TrimEdges     bool         `json:"trim_edges"`
+	Overrides     map[int]bool `json:"overrides"`
 }
 
 func (r *Run) CallUp() time.Time { return r.KeyDown.Add(-5 * time.Minute) }

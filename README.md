@@ -47,6 +47,9 @@ touches the test-night files.
 
 **Step 4, Results:** on **4 Results**, every run **Ready**, then enter each **Carrier
 frequency** on the [ARRL FMT data entry page](https://fmt.arrl.org/fmtentry.php).
+When the ARRL publishes the true frequencies, type them into **How close were you?**
+on the same tab to see each error, and copy a ready-made prompt to talk it through
+with an AI.
 
 Print the [operator checklist](https://va3mw.github.io/FMTAssistant/checklist.html)
 for the minute-by-minute version. The rest of this README explains each step.
@@ -65,6 +68,7 @@ for the minute-by-minute version. The rest of this README explains each step.
 6. [Step 2: Practice (Practice tab)](#step-2-practice-practice-tab)
 7. [Step 3: Test night (Test night tab)](#step-3-test-night-test-night-tab)
 8. [Step 4: Results and submitting (Results tab)](#step-4-results-and-submitting-results-tab)
+   - [After the results are published](#after-the-results-are-published)
 9. [The screens explained](#the-screens-explained)
    - [Setup & radio tab](#setup--radio-tab)
    - [Practice tab](#practice-tab)
@@ -530,6 +534,43 @@ By default the app uses the **average** of before and after (see the Calibration
    asks you to describe your setup; mention your radio, its reference, and that you
    used WSJT-X FreqCal.
 
+### After the results are published
+
+A few weeks after the test the ARRL publishes each carrier's true frequency on the
+[ARRL FMT page](https://fmt.arrl.org/). Comparing your answers with them is the best
+way to learn what your station really achieves.
+
+1. Open the session (**Open session…** if it isn't the current one) and go to
+   **4 Results**.
+2. In **How close were you?**, type each station's **Published frequency**, in Hz or
+   kHz (`7064001.03`, `7,064,001.03 Hz` or `7064.00103`). Clear the box to remove it.
+   It never changes your answers.
+3. For each run the table shows your answer, the **error** in Hz and in ppb (parts
+   per billion, so runs on different bands can be compared), and the error each
+   correction choice would have given: *No correction*, *Before*, *After* and
+   *Average*. The one your answer used is in bold.
+4. **What the errors suggest** puts it in plain language:
+   - whether each error is within the run's own measurement noise (σ/√N) or a bias
+     that more readings wouldn't have fixed;
+   - whether the readings drifted during the minute (Doppler, or the radio, changing);
+   - which correction choice would have been closest in hindsight (one night doesn't
+     prove it will be best next time);
+   - whether the runs share one error in ppb, which points to the frequency
+     reference or the calibration, or differ, which points to propagation;
+   - an error of more than 2 Hz is called a blunder (check the dial, the published
+     frequency you typed, and the file) and kept out of the rest.
+5. **Copy AI prompt** puts a complete, self-contained prompt on the clipboard and saves
+   it as `FMT AI prompt.txt` in the session folder. Paste it into the AI chat you use.
+   It describes how the measurements were made, your frequency reference, both
+   calibrations station by station, each run's readings around the carrier, the
+   corrections, the published frequencies and the app's own notes, and asks for the
+   likely cause of each error, ranked, and what to change next time. **Show prompt**
+   shows it first. It works before the results are published too; the AI is then
+   asked how good the measurements are likely to be.
+
+**Save report & show** adds an *Against the published frequencies* section to
+`FMT results.txt` once any are entered.
+
 ## The screens explained
 
 The tabs are in the order you use them: **1 Setup & radio**, **2 Practice**,
@@ -586,7 +627,10 @@ readings (weak ones greyed out). It also has a short checklist.
 
 ### Results tab
 
-Step 4. The four answers, the report, Copy, and Open session folder. Below them, a small
+Step 4. The four answers, the report, Copy, and Open session folder. **How close were
+you?** compares them with the published frequencies once you've typed them in, explains
+the errors and builds the AI prompt (see
+[After the results are published](#after-the-results-are-published)). Below, a small
 stability chart for each captured run shows how steady its readings were.
 
 ### Calibration tab
@@ -755,6 +799,7 @@ messages are warnings worth a look. **Blue** messages are information.
 | `6_calibration_after.all` | Calibration after the runs |
 | `session.json` | Your schedule, dial entries, choices and settings |
 | `FMT results.txt` | The report, written when you press Save report |
+| `FMT AI prompt.txt` | The AI prompt, written when you press Copy AI prompt or Show prompt |
 | `*-replaced-*.all`, `*-removed-*.all` | Earlier files kept when you replace or remove one |
 | `Archive\<UTC time>_<file>.all` | A dated copy of every file captured or loaded, for example `Archive\20261113-023612Z_2_run1_W8RKO40m.all`. These are never overwritten or renamed, so the original readings of each step are always kept. |
 
@@ -935,7 +980,8 @@ or a WWV correction on a GPS-locked radio.
 
 The ARRL publishes the results of each FMT on the [ARRL FMT page](https://fmt.arrl.org/).
 Comparing your answers with the published values afterwards is the best way to learn
-what your station really achieves.
+what your station really achieves: type them into the Results tab
+([After the results are published](#after-the-results-are-published)).
 
 ## Building from source
 
@@ -974,6 +1020,8 @@ Personalization > Colors).
 |---|---|
 | `main.go`, `app.go` | Window setup, and the methods the UI calls (state, capture, analysis, Flex, report) |
 | `live.go` | Live follow of `fmt.all` and the `live` events sent to the UI |
+| `reference.go` | Frequency reference: what the radio reports, checks and report lines |
+| `outcome.go` | Comparison with the published frequencies, and the AI prompt |
 | `internal/fmtdata` | `fmt.all` parser, live follower, calibration fit, run analysis, and tests |
 | `internal/session` | The session (schedule, slots, settings), saved as `session.json` |
 | `internal/flex` | FlexRadio LAN discovery and SmartSDR API client (slice status, DIGU tune) |

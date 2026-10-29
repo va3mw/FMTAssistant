@@ -174,6 +174,7 @@ type RunView struct {
 	CorrAfter     *float64           `json:"corr_after"`
 	FinalHz       *float64           `json:"final_hz"`
 	SliceErrHz    *float64           `json:"slice_err_hz"` // Flex slice tuning error added to the dial
+	Outcome       *Outcome           `json:"outcome"`      // against the published frequency, once entered
 	Issues        []fmtdata.Issue    `json:"issues"`
 	Ready         bool               `json:"ready"`
 }
@@ -198,8 +199,10 @@ type State struct {
 	Ref         session.RefRecord `json:"ref"` // the frequency reference now
 	VoiceOK     bool              `json:"voice_ok"`
 	Problems    int               `json:"problems"`
-	Notice      string            `json:"notice"`
-	Version     string            `json:"version"`
+	// OutcomeNotes explain the errors once published frequencies are entered.
+	OutcomeNotes []string `json:"outcome_notes"`
+	Notice       string   `json:"notice"`
+	Version      string   `json:"version"`
 }
 
 // GetState analyses everything and returns it for display.
@@ -315,6 +318,7 @@ func (a *App) GetState() State {
 			st.Problems += countErrors(r.Result.Issues)
 		}
 	}
+	st.OutcomeNotes = outcomeNotes(st.Runs, s.CalMode)
 	return st
 }
 
@@ -412,9 +416,12 @@ func (a *App) runView(r *session.Run, practice bool, before, after, pcal *fmtdat
 				}
 				v := dial + res.MeanFMeas - *rv.CorrHz
 				rv.FinalHz = &v
+				if r.PublishedHz > 0 && !practice {
+					rv.Outcome = newOutcome(dial+res.MeanFMeas, v, r.PublishedHz, rv.CorrBefore, rv.CorrAfter)
+				}
 				if math.Abs(v-r.NominalKHz*1000) > 1500 {
 					rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "warn", Msg: fmt.Sprintf(
-						"The answer is %.3f kHz from the published %.0f kHz. Check the dial entry and that this is the right file.",
+						"The answer is %.3f kHz from the scheduled %.0f kHz. Check the dial entry and that this is the right file.",
 						(v-r.NominalKHz*1000)/1000, r.NominalKHz)})
 				}
 			}
@@ -1133,6 +1140,17 @@ func (a *App) Report() (string, error) {
 			fmt.Fprintf(&b, "  %-12s %15s Hz%s\n", r.Title, fmt.Sprintf("%.2f", *r.FinalHz), flag)
 		} else {
 			fmt.Fprintf(&b, "  %-12s   not available\n", r.Title)
+		}
+	}
+	if len(st.OutcomeNotes) > 0 {
+		fmt.Fprintf(&b, "\nAGAINST THE PUBLISHED FREQUENCIES\n")
+		for _, r := range st.Runs {
+			if o := r.Outcome; o != nil {
+				fmt.Fprintf(&b, "  %-12s published %15s Hz, error %+.3f Hz (%+.1f ppb)\n", r.Title, fmt.Sprintf("%.2f", o.PublishedHz), o.ErrHz, o.ErrPPB)
+			}
+		}
+		for _, n := range st.OutcomeNotes {
+			fmt.Fprintf(&b, "  - %s\n", n)
 		}
 	}
 	fmt.Fprintf(&b, "\nCALIBRATION (mode: %s)\n", s.CalMode)
