@@ -2,12 +2,14 @@
 
 **A Windows companion for the ARRL Frequency Measuring Test (FMT), using WSJT-X FreqCal.**
 
-FMT Assistant keeps the clock and tells you, by voice, what to do and when. It
-collects the measurement files WSJT-X writes, checks them for the usual mistakes,
-and works out each carrier frequency, ready to submit.
+With your regular HF radio, you too can achieve amazing accuracy in the ARRL
+Frequency Measuring Test. Calibrate your radio against WWV first, then measure each
+carrier with the FreqCal mode of WSJT-X, and you can likely get within 1 Hz, often
+much better. You already have all the equipment you need.
 
-You still run WSJT-X by hand, as the standard procedure describes. FMT Assistant
-sits beside it.
+FMT Assistant sits beside WSJT-X on test night. It keeps the clock, tells you by
+voice what to do and when, checks the measurement files WSJT-X writes for the usual
+mistakes, and works out each carrier frequency, ready to submit.
 
 ![FMT Assistant on test night](docs/screenshot-test-night.png)
 
@@ -205,6 +207,26 @@ Do this a few days before the test.
    **Mode** column header to sort by mode and find the FreqCal entries. Keep only
    stations you can hear reliably; in North America that usually means WWV
    2.5, 5, 10, 15 and 20 MHz. Right-click to delete or add entries.
+
+   **Adding the WWV frequencies.** If your list doesn't already have them, add
+   2.5, 5, 10 and 15 MHz (and 20 MHz if you hear it). Right-click the table and
+   choose **Insert**, set **Mode** to **FreqCal**, type the station frequency in
+   MHz (for example `5.000`), and click **OK**. Repeat for each frequency, then
+   click **OK** to close Settings. With **Mode > FreqCal** selected, those entries
+   appear in the band list on the main window, and the calibration cycle steps
+   through them by itself. Pick one by hand and check that the dial lands 1.5 kHz
+   below the station (4998.500 kHz for WWV 5 MHz), so the carrier shows up near
+   1500 Hz on the waterfall.
+
+   **Or tune by hand.** You don't have to use the list at all. With **Measure**
+   checked and the calibration cycle off, set the radio to USB and tune exactly
+   1500 Hz below each WWV carrier: **2498.500**, **4998.500**, **9998.500** and
+   **14998.500 kHz**, with the WSJT-X Rx offset at 1500 Hz. Stay on each frequency
+   for a few minutes so WSJT-X collects several readings. WSJT-X follows the dial
+   through CAT and files the readings under the right station, and FMT Assistant
+   uses them just like readings from the calibration cycle. The dial must be
+   exactly on these settings: a calibration reading assumes the carrier sits
+   precisely 1500 Hz above the dial, so a dial 10 Hz off becomes a 10 Hz error.
 3. In the same Settings page, check **Frequency Calibration**:
    **Intercept = 0** and **Slope = 0**.
    - This matters. If WSJT-X has a calibration applied, it quietly moves the radio
