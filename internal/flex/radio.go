@@ -645,6 +645,37 @@ func (r *Radio) CommandWait(cmd string, timeout time.Duration) error {
 	}
 }
 
+// SliceError asks the radio how far a slice's digital tuning sits from the
+// requested frequency ("slice get_error", reply "rx,tx" in millihertz). It
+// changes after every retune. Read only.
+func (r *Radio) SliceError(slice int, timeout time.Duration) (rxMilliHz float64, err error) {
+	type reply struct {
+		code uint32
+		msg  string
+	}
+	ch := make(chan reply, 1)
+	r.Command(fmt.Sprintf("slice get_error %d", slice), func(code uint32, msg string) { ch <- reply{code, msg} })
+	select {
+	case rep := <-ch:
+		if rep.code != 0 {
+			return 0, fmt.Errorf("radio refused slice get_error (0x%08X %s)", rep.code, rep.msg)
+		}
+		return ParseSliceError(rep.msg)
+	case <-time.After(timeout):
+		return 0, fmt.Errorf("no reply from the radio to slice get_error")
+	}
+}
+
+// ParseSliceError reads the receive error from a "slice get_error" reply.
+func ParseSliceError(msg string) (float64, error) {
+	rx, _, _ := strings.Cut(strings.TrimSpace(msg), ",")
+	v, err := strconv.ParseFloat(strings.TrimSpace(rx), 64)
+	if err != nil {
+		return 0, fmt.Errorf("unexpected slice get_error reply %q", msg)
+	}
+	return v, nil
+}
+
 // TuneDigital puts a slice in DIGU with RIT off and no DIGU offset, so the
 // slice frequency is the true suppressed-carrier (dial) frequency, then tunes
 // it to dialHz and checks the radio reports it.

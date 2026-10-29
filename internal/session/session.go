@@ -24,14 +24,19 @@ type Run struct {
 	KeyDown    time.Time `json:"key_down"`    // UTC; call-up is 5 min before, key-up 1 min after
 	// CarrierHz is the operator's best estimate of the carrier, used only to
 	// suggest the dial. It starts at the nominal frequency.
-	CarrierHz   float64      `json:"carrier_hz"`
-	DialText    string       `json:"dial_text"`
-	DialHz      float64      `json:"dial_hz"`
-	RadioDialHz int64        `json:"radio_dial_hz"` // dial read from the Flex during the carrier
-	Slot        Slot         `json:"slot"`
-	MinSNR      float64      `json:"min_snr"`
-	TrimEdges   bool         `json:"trim_edges"`
-	Overrides   map[int]bool `json:"overrides"`
+	CarrierHz   float64 `json:"carrier_hz"`
+	DialText    string  `json:"dial_text"`
+	DialHz      float64 `json:"dial_hz"`
+	RadioDialHz int64   `json:"radio_dial_hz"` // dial read from the Flex during the carrier
+	// SliceErrMHz is the Flex slice's own tuning error (slice get_error, in
+	// millihertz), read at key-down on the dial SliceErrDialHz. The radio
+	// receives dial + error, so it's added to the dial. Nil when not read.
+	SliceErrMHz    *float64     `json:"slice_err_mhz,omitempty"`
+	SliceErrDialHz int64        `json:"slice_err_dial_hz,omitempty"`
+	Slot           Slot         `json:"slot"`
+	MinSNR         float64      `json:"min_snr"`
+	TrimEdges      bool         `json:"trim_edges"`
+	Overrides      map[int]bool `json:"overrides"`
 }
 
 func (r *Run) CallUp() time.Time { return r.KeyDown.Add(-5 * time.Minute) }
@@ -94,6 +99,9 @@ type Session struct {
 	// Practice is a free-standing run on any steady carrier (an AM
 	// broadcast station or WWV). It is never part of the results.
 	Practice Run `json:"practice"`
+	// PracticeCal is a WWV calibration for practice only, so rehearsing
+	// never touches the test-night calibrations.
+	PracticeCal Cal `json:"practice_cal"`
 	// CalMode picks the correction: "before", "after", "average" or "none".
 	CalMode string `json:"cal_mode"`
 	Voice   bool   `json:"voice"`
@@ -137,11 +145,12 @@ func Default() *Session {
 		},
 		Practice: Run{ID: "practice", Station: "Practice", NominalKHz: 1010, CarrierHz: 1010e3,
 			MinSNR: 20, TrimEdges: true},
-		CalMode:   "average",
-		Reference: RefInternal,
-		Voice:     true,
-		Volume:    100,
-		Beeps:     true,
+		PracticeCal: Cal{ID: "practice_cal", MinSNR: 20},
+		CalMode:     "average",
+		Reference:   RefInternal,
+		Voice:       true,
+		Volume:      100,
+		Beeps:       true,
 	}
 }
 
@@ -208,6 +217,8 @@ func (s *Session) Cal(id string) *Cal {
 		return &s.CalBefore
 	case "cal_after":
 		return &s.CalAfter
+	case "practice_cal":
+		return &s.PracticeCal
 	}
 	return nil
 }
@@ -232,6 +243,8 @@ func (s *Session) SlotFileName(id string) string {
 		return "6_calibration_after.all"
 	case "practice":
 		return fmt.Sprintf("0_practice_%skHz.all", strconv.FormatFloat(s.Practice.NominalKHz, 'f', -1, 64))
+	case "practice_cal":
+		return "0_practice_calibration.all"
 	}
 	for i, r := range s.Runs {
 		if r.ID == id {

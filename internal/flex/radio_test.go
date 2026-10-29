@@ -39,3 +39,15 @@ func TestReferenceStatus(t *testing.T) {
 		t.Fatalf("radio status: %q %+v", s.Nickname, s.Ref)
 	}
 }
+
+func TestParseSliceError(t *testing.T) {
+	if v, err := ParseSliceError("+3.814698,-9.536743"); err != nil || v != 3.814698 {
+		t.Fatalf("got %v %v", v, err)
+	}
+	if v, err := ParseSliceError(" -1.5 "); err != nil || v != -1.5 {
+		t.Fatalf("rx only: %v %v", v, err)
+	}
+	if _, err := ParseSliceError("garbage"); err == nil {
+		t.Fatal("garbage accepted")
+	}
+}

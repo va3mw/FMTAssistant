@@ -15,29 +15,38 @@ sits beside it.
 
 **What you get:** each FMT carrier's frequency, corrected for your radio's error,
 with the slips that usually cost points (wrong dial, wrong file, calibration left on
-in WSJT-X) caught before you submit. Expect an answer good to a few tenths of a
-hertz on a normal night; see [How accurate is it?](#how-accurate-is-it).
+in WSJT-X) caught before you submit. With a GPS-locked radio expect a few hundredths
+of a hertz on a quiet night; with an ordinary radio calibrated on WWV, about a tenth;
+see [How accurate is it?](#how-accurate-is-it).
 
-**Once, a few days before:**
+The app's tabs are numbered in the order you use them: **1 Setup & radio**,
+**2 Practice**, **3 Test night**, **4 Results**. *Calibration* and *Run analysis*
+are detail views you open when you want to look closer.
+
+**Step 1, Setup (once, a few days before):**
 
 1. Download `FMTAssistant.exe` from [Releases](../../releases) and run it. No installer.
 2. In WSJT-X: **Mode > FreqCal**, WWV frequencies in the FreqCal list, and
    **Settings > Frequencies** calibration intercept and slope both **0**.
-3. In FMT Assistant, **Setup & radio**: callsign, the WSJT-X log folder, your
+3. In FMT Assistant, **1 Setup & radio**: callsign, the WSJT-X log folder, your
    frequency reference, and press **Test** for the voice.
-4. Rehearse once on the **Practice** tab (a local AM station or WWV), in a session of
-   its own (**New session…**).
 
-**On the night** (the app says each step out loud; keep the **Test night** tab open):
+**Step 2, Practice (at least once before the test):** on **2 Practice**, rehearse the
+routine on a local AM station or WWV. It has its own optional calibration, so it never
+touches the test-night files.
+
+**Step 3, Test night** (the app says each step out loud; keep **3 Test night** open):
 
 1. **About 20 minutes before the first run:** WSJT-X calibration cycle on WWV with
-   **Measure** checked; stop it at the prompt and press **Capture**.
+   **Measure** checked; stop it at the prompt and press **Capture**. (With a GPS-locked
+   radio this is only a check: you'll use *No correction*.)
 2. **Each of the four runs:** at call-up set USB to the dial shown, centre the tone
    near 1500 Hz, type the exact dial into **Dial you used**, then hands off. At
    key-down WSJT-X measures for a minute; then press **Capture**.
 3. **After the last run:** calibrate on WWV again and **Capture**.
-4. **Results** tab: every run **Ready**, then enter each **Carrier frequency** on the
-   [ARRL FMT data entry page](https://fmt.arrl.org/fmtentry.php).
+
+**Step 4, Results:** on **4 Results**, every run **Ready**, then enter each **Carrier
+frequency** on the [ARRL FMT data entry page](https://fmt.arrl.org/fmtentry.php).
 
 Print the [operator checklist](https://va3mw.github.io/FMTAssistant/checklist.html)
 for the minute-by-minute version. The rest of this README explains each step.
@@ -50,17 +59,21 @@ for the minute-by-minute version. The rest of this README explains each step.
 2. [What you need](#what-you-need)
 3. [Download and install](#download-and-install)
 4. [How the measurement works](#how-the-measurement-works)
-5. [One-time setup](#one-time-setup)
-   - [WSJT-X](#wsjt-x)
-   - [FMT Assistant](#fmt-assistant-1)
+5. [Step 1: Set up (Setup & radio tab)](#step-1-set-up-setup--radio-tab)
    - [Frequency reference](#frequency-reference)
    - [FlexRadio control (optional)](#flexradio-control-optional)
-6. [Rehearse before test night](#rehearse-before-test-night)
-   - [Practice on an AM broadcast station](#practice-on-an-am-broadcast-station)
-7. [Test night, step by step](#test-night-step-by-step)
-8. [After the test: results and submitting](#after-the-test-results-and-submitting)
+6. [Step 2: Practice (Practice tab)](#step-2-practice-practice-tab)
+7. [Step 3: Test night (Test night tab)](#step-3-test-night-test-night-tab)
+8. [Step 4: Results and submitting (Results tab)](#step-4-results-and-submitting-results-tab)
 9. [The screens explained](#the-screens-explained)
+   - [Setup & radio tab](#setup--radio-tab)
+   - [Practice tab](#practice-tab)
+   - [Test night tab](#test-night-tab)
+   - [Results tab](#results-tab)
+   - [Calibration tab](#calibration-tab)
+   - [Run analysis tab](#run-analysis-tab)
    - [Live readings and the stability chart](#live-readings-and-the-stability-chart)
+   - [About tab](#about-tab)
 10. [Checks and warnings, and what to do about them](#checks-and-warnings-and-what-to-do-about-them)
 11. [Files and folders](#files-and-folders)
 12. [Using files you already have](#using-files-you-already-have)
@@ -90,7 +103,7 @@ for the minute-by-minute version. The rest of this README explains each step.
   into the session and clears it for the next step, so files can't get mixed together.
 - **Calibration.** It fits the straight line WSJT-X uses (intercept A, slope B)
   and drops weak readings (S/N under 20 dB, marked `*`) automatically. Stations
-  other than WWV/CHU, such as AM broadcasters, are left out unless you include them.
+  other than WWV/WWVH, such as AM broadcasters, are left out unless you include them.
 - **Run analysis.** It finds the one-minute key-down carrier in each run file and
   ignores CW identification and dead air. It also drops the readings at either
   end of the carrier and any wild values, then averages the rest.
@@ -177,7 +190,7 @@ FMT Assistant does all of this arithmetic. Your jobs are to run WSJT-X, set the
 dial, write down (type in) the exact dial you used, and press **Capture** after
 each step.
 
-## One-time setup
+## Step 1: Set up (Setup & radio tab)
 
 Do this a few days before the test.
 
@@ -200,7 +213,7 @@ Do this a few days before the test.
    never writes them to `fmt.all`.
 5. WSJT-X can't record the audio for you: in FreqCal mode it writes only `fmt.all`
    and no `.wav` files, even with **Save > Save all** on. If you want a recording,
-   set up a separate recorder (see [Test night](#test-night-step-by-step)).
+   set up a separate recorder (see [Test night](#step-3-test-night-test-night-tab)).
 
 ### FMT Assistant
 
@@ -231,7 +244,7 @@ shows a *New here?* note with a button that takes you there.)
    Adjust the volume, and switch voice or beeps off if you prefer. The **Voice on**
    button at the top right of the window switches voice prompts on and off quickly.
 5. **Sessions.** Each test is a *session*, a folder holding its six files, your
-   dial entries and the report. **New session…** starts a clean one (for a practice
+   dial entries and the report. **New session…** starts a clean one (for the next
    FMT, for example) and keeps your schedule and settings. **Open session…** opens
    an earlier one.
 6. **Frequency reference.** Tell the app what your radio's frequency comes from
@@ -247,7 +260,7 @@ much calibrating it needs:
 |---|---|---|
 | The radio's own oscillator (TCXO or OCXO), the usual case | **Internal oscillator** | Typically a few hertz off on 40 m, and it drifts a little with temperature. Calibrate on WWV before and after, and keep **Average** selected. |
 | An external 10 MHz of unknown accuracy (a lab generator, an older OCXO) | **External 10 MHz reference** | Treated like an internal oscillator: calibrate on WWV. |
-| GPS-disciplined: a GPSDO or GNSS module in the radio, or an external GPS-locked or rubidium 10 MHz | **GPS-disciplined**, or tick **My external 10 MHz is GPS-disciplined or rubidium** | Its error is far below 0.01 Hz once locked. A WWV calibration is still worth doing as a check of the whole chain, but **No correction** is also safe. |
+| GPS-disciplined: a GPSDO or GNSS module in the radio, or an external GPS-locked or rubidium 10 MHz | **GPS-disciplined**, or tick **My external 10 MHz is GPS-disciplined or rubidium** | Its error is far below 0.01 Hz once locked, better than any WWV calibration. Choose **No correction** on the Calibration tab. A WWV calibration would add WWV's own path Doppler (several ppb), so use it only as a check. |
 
 The reference never enters the arithmetic: the WWV calibration measures the
 radio's whole error, whatever the reference. It decides which checks apply:
@@ -262,9 +275,13 @@ radio's whole error, whatever the reference. It decides which checks apply:
 - **No correction** is an error on a run measured on a TCXO or an unlocked GPSDO
   (read from a FlexRadio), and a warning if Setup says your reference isn't
   GPS-disciplined.
-- **With a GPS-locked reference, a calibration should come out near zero.** If it
-  puts the radio more than 0.3 Hz off, the app warns: usually WSJT-X's own
-  calibration isn't zero, or the WWV readings are disturbed.
+- **With a GPS-locked reference, don't apply a WWV correction.** If a run on a locked
+  GPS reference is corrected with WWV, the app warns and shows how much the correction
+  moved the answer; the Calibration tab recommends *No correction*.
+- **With a GPS-locked reference, a WWV calibration is a check.** Within 0.03 Hz, the
+  app says the whole chain checks out; between 0.03 and 0.3 Hz, it says that's WWV's
+  path Doppler; beyond 0.3 Hz it warns, because that usually means WSJT-X's own
+  calibration isn't zero or the radio isn't really on its GPSDO.
 
 **FlexRadio users.** The app reads the radio's reference status: which reference is
 selected and which is in use, whether it's locked, and whether a TCXO, GPSDO, GNSS
@@ -307,7 +324,7 @@ frequency and mode.
 Warnings in the Flex panel tell you if the slice is not in DIGU, RIT is on, or a
 DIGU offset is set.
 
-## Rehearse before test night
+## Step 2: Practice (Practice tab)
 
 Practise the whole process at least once before the real test. Practice FMTs are
 announced on the [fmt-nuts group](https://groups.io/g/fmt-nuts), but you don't
@@ -328,15 +345,15 @@ signal is usually very strong. The app accepts frequencies from 500 kHz to 30 MH
 
 **Steps:**
 
-1. **Rehearse in a session of its own.** In **Setup & radio**, press **New
-   session…** and call it, for example, `Practice`. Your schedule and settings come
-   with it. This keeps rehearsal files, and especially a rehearsal calibration, out
-   of your test-night session. Before the test, switch back with **Open session…**.
-2. Optional but recommended: run a WWV calibration first and **Capture** it as
-   *Calibration before* on the Test night tab (in the practice session), so the
-   practice answer is corrected for your radio's error. Without a calibration, the
-   practice answer is simply dial + fMeas, uncorrected, and the app says so.
-3. Open the **Practice** tab.
+1. Open the **Practice** tab.
+2. Optional: calibrate on WWV with the **Practice calibration** card, so the practice
+   answer is corrected for your radio's error. In WSJT-X run the calibration cycle on
+   WWV for a few cycles with **Measure** checked, then press **Capture** on that card.
+   It's kept apart from the test-night calibrations, so rehearsing never touches them.
+   The practice answer uses the practice calibration if there is one, otherwise the
+   test-night calibration, otherwise none, and says which. With a GPS-locked reference,
+   skip this and choose *No correction* on the Calibration tab.
+3. Choose your carrier.
 4. Type the station's frequency in **kHz**, for example `1010`. (For WWV, use the
    **WWV 5 / 10 / 15** buttons.)
 5. Choose **Start measuring in** (1, 2 or 5 minutes; that's your call-up time).
@@ -375,9 +392,10 @@ signal is usually very strong. The app accepts frequencies from 500 kHz to 30 MH
   VA3MW measured local carriers at +1.8, +0.8 and −0.5 Hz. A steady offset that
   repeats night after night belongs to the station, not to you. What you're
   practising is the routine, and steady readings (SD of a few tenths of a hertz).
-- **WWV is exact**, so a calibrated radio should land within about 0.3 Hz. If you
-  calibrated on the same WWV frequency you practise on, the check is circular and
-  will look perfect; practise on a different WWV frequency.
+- **WWV is exact at the transmitter**, so a calibrated radio should land within
+  about 0.1 Hz, and a GPS-locked one within a few hundredths; what's left is mostly
+  the path's Doppler. If you calibrated on the same WWV frequency you practise on, the
+  check is circular and will look perfect; practise on a different WWV frequency.
 - **Never use an AM station in your real calibration.** That's why the Calibration
   tab leaves stations that aren't WWV out unless you deliberately include them.
 
@@ -397,7 +415,7 @@ You can do this on the Practice tab: press **WWV 5**, start a practice run, and
 set the dial to 4998.450 instead of the suggested 4998.500. The answer should
 still come out within a fraction of a hertz of 5,000,000.00 Hz.
 
-## Test night, step by step
+## Step 3: Test night (Test night tab)
 
 Have WSJT-X and FMT Assistant side by side. Keep the **Test night** tab open; the
 banner under the clock always says what to do now and offers the button
@@ -467,7 +485,9 @@ dial frequency into "Dial you used"**. You can type it in kHz (`7062.500`), MHz
 **30 seconds before key-down:** hands off the dial. Don't touch it until the carrier ends.
 
 **Key-down** (beep, *"Key down. Measuring."*): the banner turns red and counts down
-the minute. WSJT-X makes a reading about every six seconds. The run card's **Live
+the minute. WSJT-X makes a reading about every six seconds. With FlexRadio control on,
+the app also reads the slice's own tuning error (a few millihertz) at this moment and
+adds it to the dial in the answer. The run card's **Live
 preview** (it appears from call-up) shows the readings arriving, the running mean
 and a live carrier, with a chart of every reading. You want readings arriving, a
 steady chart and no amber warnings; see
@@ -496,7 +516,7 @@ the runs**.
 Comparing the two calibrations shows whether the radio drifted during the evening.
 By default the app uses the **average** of before and after (see the Calibration tab).
 
-## After the test: results and submitting
+## Step 4: Results and submitting (Results tab)
 
 1. Open the **Results** tab. Each run shows the dial, mean fMeas, correction and the
    **carrier frequency**. **Ready** means every check passed.
@@ -511,6 +531,10 @@ By default the app uses the **average** of before and after (see the Calibration
    used WSJT-X FreqCal.
 
 ## The screens explained
+
+The tabs are in the order you use them: **1 Setup & radio**, **2 Practice**,
+**3 Test night** and **4 Results**, then the detail views **Calibration** and
+**Run analysis**, and **About**.
 
 ### Header (always visible)
 
@@ -528,9 +552,25 @@ The **banner** below says what to do now (blue, or dark blue in dark mode). It t
 (with the seconds left), and offers **Capture** when a carrier has just ended. Before a calibration, it offers
 that calibration's **Capture** button from 45 minutes ahead.
 
+### Setup & radio tab
+
+Step 1. Session, WSJT-X folder, frequency reference, voice and sound, live readings
+and auto-capture, schedule, and FlexRadio. The app opens here until you've entered a
+callsign. See [Step 1: Set up](#step-1-set-up-setup--radio-tab).
+
+### Practice tab
+
+Step 2. This tab runs a one-minute practice measurement on any steady carrier: an AM
+broadcast station or WWV. It shows the station frequency, a lead time and a fresh
+fmt.all option, the dial to set (with Tone is at… and Set radio), the dial you used,
+and the result with its offset from nominal. The **Practice calibration** card holds an
+optional WWV calibration used only for practice. Below that is the same readings chart
+and table as the Run analysis tab. See
+[Practice on an AM broadcast station](#practice-on-an-am-broadcast-station).
+
 ### Test night tab
 
-One card per step, in order: calibration before, runs 1–4, calibration after.
+Step 3. One card per step, in order: calibration before, runs 1–4, calibration after.
 
 - **Capture fmt.all** copies the current WSJT-X file into this slot, then renames
   the original in the WSJT-X folder so the next step starts empty. If the slot
@@ -544,13 +584,21 @@ The right-hand panel shows `fmt.all` **live**: whether WSJT-X is writing to it,
 how many readings it holds, which frequencies are in it, and the last eight
 readings (weak ones greyed out). It also has a short checklist.
 
+### Results tab
+
+Step 4. The four answers, the report, Copy, and Open session folder. Below them, a small
+stability chart for each captured run shows how steady its readings were.
+
 ### Calibration tab
 
 - **Which calibration to apply:**
-  - **Average of before and after**: recommended; it splits the difference if the radio drifted.
+  - **Average of before and after**: recommended for an ordinary radio; it splits the
+    difference if the radio drifted.
   - **Before only** / **After only**: use one of them, for example if the other one is bad.
-  - **No correction (GPS-locked reference only)**: for a radio with a GPS-disciplined
-    reference, whose error is far below 0.01 Hz. The answer is then just dial + fMeas.
+  - **No correction (GPS-locked reference only)**: recommended for a radio with a
+    locked GPS-disciplined reference, whose error is far below 0.01 Hz. The answer is
+    then just dial + fMeas. The tab shows a warning if your reference is GPS-locked and
+    another choice is selected.
     The app objects if the run was measured on anything else (see
     [Frequency reference](#frequency-reference)).
 - The line under the choices shows the frequency reference now.
@@ -561,7 +609,7 @@ readings (weak ones greyed out). It also has a short checklist.
   - *Mean DF*: the average error at that station. *SD*: its scatter.
     *Residual*: how far it sits from the fitted line.
   - *Use*: **use** forces the station in, **drop** forces it out, and **auto** lets the
-    app decide (WWV/CHU in, anything else out).
+    app decide (WWV/WWVH in, anything else out).
 - **Ignore readings below … dB S/N** sets the S/N limit (default 20 dB, the same as
   WSJT-X's `*` flag).
 
@@ -583,11 +631,6 @@ Choose a run with the buttons at the top.
   carrier reading** is normally on, because those readings usually overlap the
   start or end of the carrier.
 
-### Results tab
-
-The four answers, the report, Copy, and Open session folder. Below them, a small
-stability chart for each captured run shows how steady its readings were.
-
 ### Live readings and the stability chart
 
 While a step is on, FMT Assistant reads the new lines WSJT-X adds to `fmt.all`
@@ -599,7 +642,7 @@ the live view simply starts over with the new file.
 **When it follows the file.** During the before calibration (from 20 minutes before
 the first call-up until you capture it), each run from call-up until it is captured,
 the after calibration, and a practice run. **Watch live** on the Calibration and
-Practice tabs starts it at any other time, for example to look at WWV or CHU.
+Practice tabs starts it at any other time, for example to look at WWV or WWVH.
 
 **The live numbers** (in a dashed box marked *Live preview*):
 
@@ -617,14 +660,14 @@ file you capture, analysed exactly as before (edges trimmed, outliers rejected, 
 the calibration you chose on the Calibration tab).
 
 **The stability chart** shows each reading over time as an offset from the mean, in
-hertz. The scale adjusts itself; on a good night the readings stay within ±0.5 Hz.
+hertz. The scale adjusts itself; on a quiet night the readings stay within a few
+tenths of a hertz of each other.
 
 - Dots are coloured by S/N (amber 20-30 dB, teal 30-40 dB, blue 40 dB and up).
   Readings below the S/N limit are faded and not used.
 - The solid line is the mean, and the blue band is ±1σ around it.
 - The thin green band is ±0.05 Hz, about the measurement noise of FreqCal. Readings
-  that wander well outside it are the path (HF Doppler is typically 0.1-0.5 Hz at
-  night), not your radio.
+  that wander well outside it are the path's Doppler, not your radio.
 - The red shaded strip is the scheduled key-down minute.
 - The bars on the right are a histogram of the readings in use.
 - On the Run analysis and Results tabs, hollow dots were strong but left out of the
@@ -651,20 +694,6 @@ from the stations measured so far.
 minute after each key-up, but only when that slot is still empty, so it never
 replaces a file. You still type the dial you used.
 
-### Practice tab
-
-This tab runs a one-minute practice measurement on any steady carrier: an AM
-broadcast station or WWV. It shows the station frequency, a lead time and a fresh
-fmt.all option, the dial to set (with Tone is at… and Set radio), the dial you used,
-and the result with its offset from nominal. Below that is the same readings chart
-and table as the Run analysis tab. See
-[Practice on an AM broadcast station](#practice-on-an-am-broadcast-station).
-
-### Setup & radio tab
-
-Session, WSJT-X folder, voice and sound, schedule, and FlexRadio. See
-[One-time setup](#one-time-setup).
-
 ### About tab
 
 The version, author and license, and links to the
@@ -688,7 +717,7 @@ messages are warnings worth a look. **Blue** messages are information.
 | *The dial … does not match the file* | WSJT-X logs the station's kHz, so only a 1 kHz range of dials is possible. Yours is outside it, which usually means a typo (7062.152 for 7062.512). | Correct the dial entry. |
 | *This file was measured near X kHz but … is near Y kHz* | The file belongs to a different station. | Load the correct file into this run; the message suggests which run the file belongs to. |
 | *…looks like a calibration file, not a test run* | The run file was measured on a WWV frequency. | Load the correct run file. |
-| *Most readings in this file are not on WWV/CHU* | A run file is in a calibration slot. | Load the calibration file. |
+| *Most readings in this file are not on WWV/WWVH* | A run file is in a calibration slot. | Load the calibration file. |
 | *… have the same file loaded* | One file is in two slots. | Capture or load the right file for each slot. |
 | *… readings fall in the … time slot* | The file also holds another run's readings, usually because Capture wasn't pressed between runs. | Check on the Run analysis tab that the highlighted carrier is the right one; override readings if needed. |
 | *The carrier found … is outside the scheduled key-down time* | The strongest stretch of signal isn't at the scheduled time. Stations sometimes start late; this can also mean the wrong file. | Check the chart and readings; fix the schedule if it was wrong. |
@@ -705,7 +734,9 @@ messages are warnings worth a look. **Blue** messages are information.
 | *…measured on … but the … calibration was made on …* | The run and its calibration were on different frequency references, so the calibration doesn't apply. | Calibrate again on the reference the run used, or choose the calibration made on it. |
 | *The radio's frequency reference changed while this run (calibration) was measured* | For example the GPSDO dropped out and the radio fell back to its TCXO. | Keep only the readings from one side of the change, or calibrate again. |
 | *No correction is selected, but this run was measured on …* | No correction is only right for a locked GPS-disciplined reference. | Choose a WWV calibration on the Calibration tab. |
-| *Your reference is GPS-locked, so this calibration should be close to zero* | A locked GPSDO leaves almost nothing to calibrate, so a large correction points elsewhere. | Check WSJT-X's own calibration is zero, and the WWV readings. |
+| *This run was measured on a locked GPS-disciplined reference … Applying the WWV correction … adds WWV's own path Doppler* | A WWV correction makes a GPS-locked radio less accurate. | Choose **No correction** on the Calibration tab. |
+| *Your reference is GPS-locked, so this calibration … is measuring WWV's path Doppler* (blue) / *…should be close to zero, but it puts the radio … off* (amber) | With a GPS-locked radio the WWV calibration is only a check. Within a few hundredths it agrees; more than 0.3 Hz points at a setup fault. | Nothing for the blue one. For the amber one, check WSJT-X's own calibration is zero and that the radio is on its GPSDO. |
+| *This schedule is for a test that's over* | The schedule's last run ended more than 12 hours ago. | **New session…** for the next FMT, then enter its times under **Schedule (UTC)**. |
 | *The radio is set to use its … reference but is running on its …* / *GPSDO isn't locked* (Flex) | The chosen reference is missing or lost, or the GPSDO hasn't locked yet. | Fix the reference, or wait for lock, before calibrating. |
 | *The PC clock is … s ahead of / behind the radio's GPS time* (Flex) | The schedule runs from the PC clock. | Sync Windows time. |
 
@@ -717,6 +748,7 @@ messages are warnings worth a look. **Blue** messages are information.
 
 | File | Contents |
 |---|---|
+| `0_practice_calibration.all` | The practice calibration, if you captured one |
 | `0_practice_<freq>kHz.all` | The latest practice run |
 | `1_calibration_before.all` | Calibration before the runs |
 | `2_run1_W8RKO40m.all` … `5_run4_K5CM80m.all` | The four runs (names follow your schedule) |
@@ -844,44 +876,62 @@ the two corrections, depending on your choice.
 ## How accurate is it?
 
 The app shows the answer to **0.01 Hz** because that's how the ARRL entry form takes
-it, and rounding to a coarser figure would only add error. That doesn't mean the
-second decimal is right. On a normal night a careful measurement is good to **a few
-tenths of a hertz**, and the first decimal is the one that means something.
+it. How many of those decimals are real depends mostly on your radio's frequency
+reference:
 
-**Where the error comes from**, largest first, for a 40 or 80 m carrier at night:
+| Your radio | What to expect on a quiet night | What limits it |
+|---|---|---|
+| **GPS-disciplined reference, locked**, with *No correction* | about **±0.01-0.05 Hz** on 80 and 40 m | Doppler on the path from the FMT transmitter to you |
+| **TCXO or OCXO**, calibrated on WWV before and after | about **±0.05-0.1 Hz** | WWV's own path Doppler, carried into the correction, and the radio drifting between the calibrations and the runs |
+
+These figures come from measurements on a quiet path (in VA3MW's WWV measurements the
+scatter was about 6 ppb from second to second, averaging down to about 0.5 ppb over
+20 seconds). A disturbed night can be several times worse, for every radio.
+
+**Where the error comes from** (1 ppb is 0.007 Hz at 7 MHz and 0.0036 Hz at 3.6 MHz):
 
 | Source | Typical size | What helps |
 |---|---|---|
-| **The path to the FMT station.** The ionosphere moves, which shifts the carrier you receive (Doppler). Nothing at your end can remove this. | 0.1-0.5 Hz, sometimes more | Nothing in the measurement. A steady chart during key-down is a good sign; a sloping one (large drift) or a jumpy one is a warning. |
-| **The calibration.** WWV readings carry their own path Doppler, and the fit through them carries that into the correction. | 0.05-0.3 Hz | Several WWV frequencies, several cycles, before and after averaged. A small fit StdDev and close before/after calibrations are good signs. |
-| **Your radio drifting** between the calibrations and the runs (a TCXO or OCXO warming or cooling). | Up to a few tenths of a hertz | Hours of warm-up, and **Average** of before and after. A GPS-disciplined reference removes this. |
-| **Measurement noise** in WSJT-X FreqCal itself. | About 0.05 Hz per reading; about 0.02 Hz for a minute's average | A strong signal (S/N well over 20 dB). This is the faint green band on the stability chart. |
+| **The path to the FMT station.** The ionosphere moves, which shifts the carrier you receive (Doppler). Averaging removes the fast wobble, but no one can average away a slow drift. | A few ppb: about 0.01-0.05 Hz on 80 and 40 m | Average the whole key-down minute (the app does). A steady chart and steady S/N are good signs; a sloping chart (large drift) or a jumpy one is a warning. |
+| **A WWV calibration** (only when you apply one). WWV readings carry their own path Doppler, and the fit carries it into the correction. | Several ppb: a few hundredths of a hertz | Several WWV frequencies, several cycles, before and after averaged. With a GPS-locked radio, don't apply it at all. |
+| **Your radio drifting** between the calibrations and the runs (a TCXO or OCXO warming or cooling). | A few ppb to tens of ppb over the evening | Hours of warm-up, and **Average** of before and after. A GPS-disciplined reference removes this. |
+| **Measurement noise** in WSJT-X FreqCal. | About 0.05 Hz per reading; about 0.02 Hz for a minute's average | A strong signal (S/N well over 20 dB). This is the faint green band on the stability chart. |
+| **The Flex slice's tuning error.** | A few millihertz | Read at key-down and added to the dial automatically when FlexRadio control is on. |
+| **A locked GPSDO's own error.** | Under a millihertz | Nothing to do. |
 | **Your dial entry.** | Zero if correct; a typo is usually kHz off | Type the exact dial; the app checks it against what WSJT-X logged. |
-
-These don't simply add up (some partly cancel, and the path errors vary from night to
-night), but they show why a good total is about **±0.1-0.3 Hz**, and why ±0.5 Hz is
-still a fine result on a disturbed night.
 
 **How to read the numbers the app shows:**
 
 - **σ/√N** (the *±* after the live carrier, and *SEM* on Run analysis) is only the
   measurement noise of the average: how much the answer would move if the same minute
-  were measured again. It leaves out path Doppler, the calibration and drift, so it's
-  always smaller than the real uncertainty. A value of 0.02 Hz says the minute was
-  measured cleanly, not that the answer is right to 0.02 Hz.
+  were measured again. It leaves out the path's slow Doppler, the calibration and
+  drift, so it's always smaller than the real uncertainty.
 - **σ (SD)** of a run's readings: a few hundredths to a few tenths of a hertz is
   normal. Much larger usually means QRM, fading or the dial being touched.
-- **Drift** in Hz per minute: a steady slope during key-down is usually Doppler on the
-  path; the average still lands near the middle of the minute.
+- **Drift** in Hz per minute: a steady slope during key-down is Doppler on the path;
+  the average lands near the middle of the minute.
 - **Calibration StdDev** (how far the WWV stations sit from the fitted line): under
-  0.3 Hz is good. It's a fair guide to how much the correction itself can be trusted.
+  0.3 Hz is good. With a GPS-locked radio, the calibration itself shows WWV's path
+  Doppler, and the app says so.
 - **Before vs after calibrations:** if they differ by more than about 0.3 Hz at the
   run frequency, the radio drifted, and the true answer could be anywhere between
   them. The app warns, and **Average** splits the difference.
 
+**Tips for the last few hundredths:**
+
+- **With a GPS-locked radio, use *No correction*,** and confirm the reference shows
+  *locked* before and during the test.
+- **Average the whole key-down minute** and leave out deep fades: fades are when the
+  phase jumps. Readings under the S/N limit (20 dB) are already dropped; on a fading
+  night, raise **Weak below** on Run analysis and see whether the answer moves.
+- **Steady S/N usually means steady Doppler.** The test runs in the evening, when the
+  F layer is usually calmer than at dusk, but 80 and 40 m can still shift.
+- **A Doppler gauge, if you have a second receiver:** watch WWV 10 MHz on it during the
+  test. Its apparent wobble shows how disturbed the ionosphere is. It's a different
+  path, so it can't correct anything, but it tells you how far to trust each minute.
+
 **What doesn't help:** more decimal places, averaging beyond the one-minute key-down,
-or a GPSDO's tiny remaining error. A GPS-disciplined reference removes your radio's
-error and drift, but not the path's Doppler, which is usually the largest part.
+or a WWV correction on a GPS-locked radio.
 
 The ARRL publishes the results of each FMT on the [ARRL FMT page](https://fmt.arrl.org/).
 Comparing your answers with the published values afterwards is the best way to learn

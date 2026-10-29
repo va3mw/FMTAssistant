@@ -79,6 +79,9 @@ header .brand small{display:block;color:#93a1b5;font-weight:400}
 nav{display:flex;gap:2px;padding:0 18px;background:var(--panel);border-bottom:1px solid var(--line)}
 nav button{border:none;border-bottom:3px solid transparent;border-radius:0;padding:10px 14px;background:none;color:var(--muted);font-weight:600}
 nav button.on{color:var(--ink);border-bottom-color:var(--accent)}
+nav .stepno{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:50%;background:var(--chip);color:var(--muted);font-size:11px;margin-right:6px;text-align:center}
+nav button.on .stepno{background:var(--accent);color:var(--accent-ink)}
+nav .navsep{width:1px;background:var(--line);margin:8px 10px}
 nav .badge{background:var(--err);color:#fff;border-radius:999px;font-size:11px;padding:0 6px;margin-left:5px}
 main{flex:1;overflow:auto;padding:16px 18px 40px}
 .tab{display:none}.tab.on{display:block}
@@ -188,12 +191,13 @@ pre.report{background:#0f141c;color:#d7e0ec;padding:12px;border-radius:8px;font-
 </header>
 <div id="banner"><div class="grow"><div class="big" id="bannerBig">Loading…</div><div id="bannerSub" class="muted"></div></div><div id="bannerBtns" class="row"></div></div>
 <nav>
-  <button data-tab="night" class="on" onclick="showTab('night')">Test night</button>
+  <button data-tab="setup" onclick="showTab('setup')"><span class="stepno">1</span>Setup &amp; radio<span class="badge" id="bSetup" hidden></span></button>
+  <button data-tab="practice" onclick="showTab('practice')"><span class="stepno">2</span>Practice</button>
+  <button data-tab="night" class="on" onclick="showTab('night')"><span class="stepno">3</span>Test night</button>
+  <button data-tab="results" onclick="showTab('results')"><span class="stepno">4</span>Results</button>
+  <span class="navsep"></span>
   <button data-tab="cal" onclick="showTab('cal')">Calibration<span class="badge" id="bCal" hidden></span></button>
   <button data-tab="runs" onclick="showTab('runs')">Run analysis<span class="badge" id="bRuns" hidden></span></button>
-  <button data-tab="results" onclick="showTab('results')">Results</button>
-  <button data-tab="practice" onclick="showTab('practice')">Practice</button>
-  <button data-tab="setup" onclick="showTab('setup')">Setup &amp; radio<span class="badge" id="bSetup" hidden></span></button>
   <button data-tab="about" onclick="showTab('about')">About</button>
 </nav>
 <main>
@@ -489,8 +493,8 @@ function calCard(c, when){
       <b>Stations / StdDev</b><span class="mono">${r.n_fit} / ${r.rms.toFixed(3)} Hz</span>
       <b>Readings</b><span>${r.used} used of ${r.total} (${r.first}-${r.last} UTC)</span>
       ${refLine(c.cal.slot.ref)}</div>`:''}
-    <div class="row" style="margin-top:10px">${slotButtons(c.id, c.present)}<button onclick="showTab('cal')">Details</button></div>
-    ${L.step===c.id? calLiveBlock(c):''}
+    <div class="row" style="margin-top:10px">${slotButtons(c.id, c.present)}${c.id==='practice_cal'? watchButton(c.id) : `<button onclick="showTab('cal')">Details</button>`}</div>
+    ${L.step===c.id? calLiveBlock(c) : (c.id==='practice_cal'? calCaptured(c) : '')}
     ${issuesHTML(issues)}
   </div>`;
 }
@@ -522,6 +526,7 @@ function runCard(rv, idx){
           <b>Correction</b><span class="mono">${rv.corr_hz!=null? (rv.corr_hz>=0?'+':'')+rv.corr_hz.toFixed(3)+' Hz':'-'}</span>
           <b>Carrier</b><span class="answer ${rv.ready?'ok':''}">${rv.final_hz!=null? fmtHz(rv.final_hz):'-'}</span>
           ${refLine(r.slot.ref)}
+          ${rv.slice_err_hz!=null?`<b>Slice tuning error</b><span class="mono">${(rv.slice_err_hz*1000>=0?'+':'')+(rv.slice_err_hz*1000).toFixed(1)} mHz <span class="hint">(added to the dial)</span></span>`:''}
         </div>
       </div>
     </div>
@@ -531,14 +536,25 @@ function runCard(rv, idx){
   </div>`;
 }
 
+// schedulePast is true once the last run of the schedule ended more than 12 hours ago.
+function schedulePast(){ return S.runs.length && Date.now() > new Date(S.runs[S.runs.length-1].key_up).getTime()+12*3600e3 }
+function pastScheduleCard(){
+  if(!schedulePast()) return '';
+  const d=new Date(S.runs[0].run.key_down).toISOString().substr(0,10), any=S.runs.some(r=>r.present);
+  return `<div class="card" style="border-color:var(--warn)"><h2>This schedule is for a test that's over (${d} UTC)</h2>
+    <div class="hint" style="font-size:13px">${any?'This session holds that test\'s files, so leave it as it is. ':''}For the next FMT, press <b>New session…</b> in Setup &amp; radio,
+    then enter the new times under <b>Schedule (UTC)</b> from the <a href="#" onclick="openURL('https://fmt.arrl.org/');return false">ARRL FMT page</a>.
+    Until then, the prompts and countdowns point at the old dates.</div>
+    <div class="row" style="margin-top:8px"><button class="primary" onclick="showTab('setup')">Open Setup &amp; radio</button></div></div>`;
+}
 function renderTimeline(){
   if(!S.runs.length) return;
   const fresh=!S.session.callsign && !S.cals.some(c=>c.present) && !S.runs.some(r=>r.present) && !S.practice.present;
-  const intro=fresh? `<div class="card" style="border-color:var(--accent)"><h2>New here? Start in Setup &amp; radio</h2>
-    <div class="hint" style="font-size:13px">Enter your callsign, check the WSJT-X log folder and test the voice there, then rehearse on the <b>Practice</b> tab
-    (in a session of its own). This tab is for test night: one card per step, in order. This note goes away once you've entered your callsign.</div>
+  const intro=(fresh? `<div class="card" style="border-color:var(--accent)"><h2>New here? Start with step 1, Setup &amp; radio</h2>
+    <div class="hint" style="font-size:13px">Enter your callsign, check the WSJT-X log folder, choose your frequency reference and test the voice there,
+    then rehearse on step 2, <b>Practice</b>. This tab is step 3, test night: one card per step, in order. This note goes away once you've entered your callsign.</div>
     <div class="row" style="margin-top:8px"><button class="primary" onclick="showTab('setup')">Open Setup &amp; radio</button>
-    <button onclick="openURL('https://va3mw.github.io/FMTAssistant/checklist.html')">Printable checklist</button></div></div>` : '';
+    <button onclick="openURL('https://va3mw.github.io/FMTAssistant/checklist.html')">Printable checklist</button></div></div>` : '') + pastScheduleCard();
   const first=S.runs[0].call_up, last=S.runs[S.runs.length-1].key_up;
   const b=new Date(new Date(first).getTime()-20*60e3), a=new Date(new Date(last).getTime()+60e3);
   let h=intro+calCard(S.cals[0], `About 20 minutes before the first run (≈${hhmm(b)}Z). WWV, mode FreqCal, Measure on, Tools > Execute frequency calibration cycle, several cycles.`);
@@ -561,7 +577,7 @@ function renderSide(){
   </div>`;
   h+=`<div class="card"><h2>Before each step</h2><ol class="steps">
     <li>Every step: WSJT-X <b>Mode &gt; FreqCal</b> and the <b>Measure</b> box checked (the step most people miss).</li>
-    <li><b>Calibration</b> (before and after): also turn <b>Tools &gt; Execute frequency calibration cycle</b> on, so WSJT-X steps through the WWV/CHU list.
+    <li><b>Calibration</b> (before and after): also turn <b>Tools &gt; Execute frequency calibration cycle</b> on, so WSJT-X steps through the WWV/WWVH list.
     Do <b>not</b> click Apply in Solve for calibration; this app applies it.</li>
     <li><b>Test runs</b>: calibration cycle <b>off</b>, only <b>Measure</b> on. The cycle would retune the radio away from the test station.
     Set the dial by hand, then hands off.</li>
@@ -570,13 +586,15 @@ function renderSide(){
 }
 async function clearFmt(){ if(confirm('Rename the current fmt.all so WSJT-X starts a new one? Nothing is deleted.')){ try{ toast(await api().ClearFmtAll()) }catch(e){ toast(String(e),true) } refresh() } }
 
+function gpsLocked(){ return S.ref && S.ref.kind==='gps' && S.ref.locked }
 function renderCal(){
-  const mode=S.session.cal_mode;
+  const mode=S.session.cal_mode, gps=gpsLocked();
   let h=`<div class="card"><h2>Which calibration to apply</h2><div class="row">
-    ${[['average','Average of before and after (recommended)'],['before','Before only'],['after','After only'],['none','No correction (GPS-locked reference only)']].map(([v,l])=>
+    ${[['average','Average of before and after'+(gps?'':' (recommended)')],['before','Before only'],['after','After only'],['none','No correction (GPS-locked reference only)'+(gps?' (recommended)':'')]].map(([v,l])=>
       `<label class="chk"><input type="radio" name="calmode" ${mode===v?'checked':''} onchange="call('SetCalMode','${v}')"> ${l}</label>`).join('')}
     </div><div class="hint" style="margin-top:6px">Correction at frequency f (MHz) is A + B×f. Carrier = dial + mean fMeas − correction.
     Frequency reference now: <b>${esc(S.ref.detail)}</b>${S.ref.from==='setup'?' (as set in Setup &amp; radio)':' (read from the radio)'}.
+    ${gps&&mode!=='none'?issuesHTML([{level:'warn', msg:'Your reference is GPS-locked, so choose No correction. It is already far more accurate than a WWV calibration, which would add WWV\'s own path Doppler (several ppb). Calibrate on WWV only as a check.'}]):''}
     A calibration only holds for the reference it was made on; the app records the reference with each file you capture.</div></div>`;
   for(const c of S.cals){
     const r=c.result;
@@ -695,8 +713,7 @@ function chart(res, rv, o={}){
 // Everything here is a preview: the submitted answer still comes from Capture.
 let L={step:'', gen:-1, lines:[], gone:false, err:'', since:0, lastNew:0};
 let liveAsked=null, liveManual='';
-const REFS=[[2500,'WWV 2.5 MHz'],[5000,'WWV 5 MHz'],[10000,'WWV 10 MHz'],[15000,'WWV 15 MHz'],[20000,'WWV 20 MHz'],[25000,'WWV 25 MHz'],
-  [3330,'CHU 3.33 MHz'],[7850,'CHU 7.85 MHz'],[14670,'CHU 14.67 MHz']];
+const REFS=[[2500,'WWV 2.5 MHz'],[5000,'WWV 5 MHz'],[10000,'WWV 10 MHz'],[15000,'WWV 15 MHz'],[20000,'WWV 20 MHz'],[25000,'WWV 25 MHz']];
 function refStation(khz){ return REFS.find(([k])=>khz>=k-1 && khz<=k+1) }
 
 function applyLive(snap){ L.step=snap.step||''; L.gen=snap.gen; L.gone=!!snap.gone; L.err=snap.err||''; L.lines=snap.lines||[] }
@@ -771,8 +788,9 @@ function liveRun(rv){
   if(st.n>=5 && sdiff(good[st.n-1].sec, good[0].sec)>=20){ const t0=good[0].sec; drift=linFit(good.map(l=>sdiff(l.sec,t0)/60), vals).b }
   const typed=r.dial_hz>0, dial=typed? r.dial_hz : rv.suggest_dial_hz;
   let corr=0, corrNote='uncorrected (no usable calibration yet)';
-  const cal=[S.cals[0], ...(r.id==='practice'?[S.cals[1]]:[])].find(usableCal);
-  if(st.n && cal){ const f=(dial+st.mean)/1e6; corr=cal.result.a+cal.result.b*f; corrNote=`${cal.id==='cal_before'?'before':'after'}-calibration correction ${sgn(corr,3)} Hz` }
+  const cal=S.session.cal_mode==='none'? null : [...(r.id==='practice'?[S.practice_cal]:[]), S.cals[0], ...(r.id==='practice'?[S.cals[1]]:[])].find(usableCal);
+  if(S.session.cal_mode==='none') corrNote='no correction (GPS-locked reference)';
+  if(st.n && cal){ const f=(dial+st.mean)/1e6; corr=cal.result.a+cal.result.b*f; corrNote=`${({cal_before:'before', cal_after:'after', practice_cal:'practice'})[cal.id]}-calibration correction ${sgn(corr,3)} Hz` }
   const carrier=st.n? dial+st.mean-corr : null;
   const warn=quietWarning();
   const recent=L.lines.filter(strong).slice(-10);
@@ -818,7 +836,7 @@ function calStations(lines, min, toggles){
   return [...by.keys()].sort((a,b)=>a-b).map(khz=>{
     const ls=by.get(khz), ref=refStation(khz), good=ls.filter(l=>!l.flag && l.snr>=min), st=meanSD(good.map(l=>l.df));
     let inc=!!ref; if(toggles && khz in toggles) inc=toggles[khz];
-    return {khz, label: ref? ref[1] : (khz/1000).toFixed(3)+' MHz (not WWV/CHU)', lines:ls, n:st.n, mean:st.mean, sd:st.sd, included: inc && st.n>0};
+    return {khz, label: ref? ref[1] : (khz/1000).toFixed(3)+' MHz (not WWV/WWVH)', lines:ls, n:st.n, mean:st.mean, sd:st.sd, included: inc && st.n>0};
   });
 }
 function calFit(sts){
@@ -985,6 +1003,8 @@ function renderPractice(){
     carrier sits on a round frequency (a multiple of 10 kHz in the Americas, 9 kHz elsewhere). That lets you rehearse the whole
     test-night routine whenever you like: set the dial, centre the tone, type the dial, measure for one minute, capture, and read the answer.</p>
     <ol class="steps">
+      <li>Optional: calibrate on WWV with the <b>Practice calibration</b> card below, so the answer is corrected for your radio's error.
+      It's kept apart from the test-night calibrations, so rehearsing never touches them.</li>
       <li>Type the station's frequency in kHz (for example 1010), or pick WWV.</li>
       <li>Choose how long you need to get ready, leave <b>Start a fresh fmt.all</b> ticked so earlier readings can't mix in,
       then press <b>Start practice</b>. The app counts down to a one-minute measuring window with the same voice prompts as test night.</li>
@@ -994,15 +1014,17 @@ function renderPractice(){
       Nothing is analysed until you do. The answer, and how far it is from the station's nominal frequency, then appear here.</li>
     </ol>
     <div class="hint">The radio must receive the AM broadcast band; most HF transceivers and all FlexRadio 6000 models do.
-    Run a WWV calibration first (Test night tab) if you want the answer corrected for your radio's error. Without one, the practice answer is uncorrected.</div>
-    ${issuesHTML([{level:/practi[cs]e|rehears/i.test(S.session.name)?'info':'warn', msg:`Rehearse in a session of its own (Setup & radio > New session…, for example "Practice"), so a rehearsal calibration doesn't end up in your test-night session. Before the test, switch back with Open session…. This session is "${S.session.name}".`}])}
+    The practice answer uses the practice calibration if you've captured one, otherwise the test-night calibration, otherwise none (it says which).
+    With a GPS-locked reference, choose No correction on the Calibration tab and skip the practice calibration.</div>
   </div>
+  ${calCard(S.practice_cal, 'WSJT-X: Mode FreqCal, Measure on, Tools > Execute frequency calibration cycle on WWV for a few cycles, then press Capture. Optional, and for practice only.')}
   <div class="card"><h2>How to judge the result</h2>
     <ul class="steps">
       <li><b>AM broadcast stations are not frequency standards.</b> Many are within a hertz or two of nominal, and some are GPS-locked,
       but the legal tolerance is ±20 Hz. VA3MW measured local carriers at +1.8, +0.8 and −0.5 Hz. If the same offset shows up night after night, it belongs to the station, not to you.
       What matters in practice is that the routine works and the readings are steady (SD of a few tenths of a hertz).</li>
-      <li><b>WWV is exact</b>, so a calibrated radio should land within about 0.3 Hz. If you calibrated on the same WWV frequency, the check is circular and will look perfect.</li>
+      <li><b>WWV is exact at the transmitter</b>, so a calibrated radio should land within about 0.1 Hz, or a few hundredths with a GPS-locked reference; what's left is mostly the path's Doppler.
+      If you calibrated on the same WWV frequency, the check is circular and will look perfect.</li>
       <li>Never use an AM station in your real calibration. That's why the Calibration tab leaves out stations that aren't WWV.</li>
     </ul>
   </div>
@@ -1033,7 +1055,7 @@ function renderPractice(){
       <b>Carrier</b><span class="answer ${pv.ready?'ok':''}">${pv.final_hz!=null? fmtHz(pv.final_hz):'-'}</span>
       <b>vs nominal</b><span class="answer">${dev!=null? (dev>=0?'+':'')+dev.toFixed(2)+' Hz':'-'}</span>
     </div>
-    ${dev!=null?`<div class="hint" style="margin-top:4px">${isWWV?'WWV is exact: within ±0.3 Hz is excellent for a calibrated radio.':'Broadcast carriers are often 1-2 Hz off nominal. Compare with other nights rather than expecting zero.'}</div>`:''}
+    ${dev!=null?`<div class="hint" style="margin-top:4px">${isWWV?'WWV is exact at the transmitter: within ±0.1 Hz is excellent for a calibrated radio, a few hundredths with a GPS-locked one.':'Broadcast carriers are often 1-2 Hz off nominal. Compare with other nights rather than expecting zero.'}</div>`:''}
     <div class="row" style="margin-top:10px">${slotButtons('practice', pv.present)}</div>
   </div>
   ${L.step==='practice'? `<div class="card"><h2>Live readings</h2>${liveBlock(pv, 600)}</div>` : ''}
@@ -1086,6 +1108,7 @@ function renderSetup(){
     <div class="hint">Off by default. It captures only a slot that is still empty, so it never replaces a file. You still type the dial you used.</div></div>
   </div><div>
   <div class="card"><h2>Schedule (UTC)</h2><div class="hint">Defaults are the November 13, 2026 test. Call-up is 5 minutes before key-down; the carrier lasts 1 minute.</div>
+    ${schedulePast()?issuesHTML([{level:'warn', msg:'These times are for a test that is over. For the next FMT, start a New session (above) and enter its times here from the ARRL FMT page.'}]):''}
     <table style="margin-top:8px"><tr><th>Station</th><th>Band</th><th>Near (kHz)</th><th>Key-down (UTC)</th><th></th></tr>
     ${S.runs.map(rv=>{ const r=rv.run, kd=new Date(r.key_down).toISOString().substr(0,16).replace('T',' ');
       return `<tr id="ed-${r.id}"><td><input value="${esc(r.station)}" style="width:80px"></td><td><input value="${esc(r.band)}" style="width:60px"></td>
@@ -1151,15 +1174,17 @@ async function openSession(){ try{ const p=await api().OpenSession(); if(p) toas
 
 // ------------------------------------------------------------------ loop
 let busy=false;
+// The first time (no tab remembered), start at step 1 until a callsign is set.
+function firstTab(){ if(!document.querySelector('nav button.on[data-tab]')||!safeGet('tab')) showTab(S.session.callsign?'night':'setup') }
 async function refresh(){
   if(busy) return; busy=true;
   // A call that never answers (a Go panic is dropped by Wails) must not stop
   // the refresh loop for good.
   const timeout=new Promise((_,rej)=>setTimeout(()=>rej(new Error('GetState did not answer within 5 s')), 5000));
-  try{ S=await Promise.race([api().GetState(), timeout]); render() }catch(e){ console.error(e) } finally{ busy=false }
+  try{ S=await Promise.race([api().GetState(), timeout]); if(!safeGet('tab')) firstTab(); render() }catch(e){ console.error(e) } finally{ busy=false }
 }
 window.addEventListener('DOMContentLoaded', ()=>{
-  showTab(safeGet('tab')||'night');
+  showTab(safeGet('tab')||'');
   window.runtime.EventsOn('changed', refresh);
   window.runtime.EventsOn('live', onLive);
   api().GetLive().then(applyLive);

@@ -173,6 +173,7 @@ type RunView struct {
 	CorrBefore    *float64           `json:"corr_before"`
 	CorrAfter     *float64           `json:"corr_after"`
 	FinalHz       *float64           `json:"final_hz"`
+	SliceErrHz    *float64           `json:"slice_err_hz"` // Flex slice tuning error added to the dial
 	Issues        []fmtdata.Issue    `json:"issues"`
 	Ready         bool               `json:"ready"`
 }
@@ -186,18 +187,19 @@ type FlexView struct {
 }
 
 type State struct {
-	Session  *session.Session  `json:"session"`
-	Dir      string            `json:"dir"`
-	WSJTX    WSJTXView         `json:"wsjtx"`
-	Cals     []CalView         `json:"cals"`
-	Runs     []RunView         `json:"runs"`
-	Practice RunView           `json:"practice"`
-	Flex     FlexView          `json:"flex"`
-	Ref      session.RefRecord `json:"ref"` // the frequency reference now
-	VoiceOK  bool              `json:"voice_ok"`
-	Problems int               `json:"problems"`
-	Notice   string            `json:"notice"`
-	Version  string            `json:"version"`
+	Session     *session.Session  `json:"session"`
+	Dir         string            `json:"dir"`
+	WSJTX       WSJTXView         `json:"wsjtx"`
+	Cals        []CalView         `json:"cals"`
+	Runs        []RunView         `json:"runs"`
+	Practice    RunView           `json:"practice"`
+	PracticeCal CalView           `json:"practice_cal"`
+	Flex        FlexView          `json:"flex"`
+	Ref         session.RefRecord `json:"ref"` // the frequency reference now
+	VoiceOK     bool              `json:"voice_ok"`
+	Problems    int               `json:"problems"`
+	Notice      string            `json:"notice"`
+	Version     string            `json:"version"`
 }
 
 // GetState analyses everything and returns it for display.
@@ -222,9 +224,10 @@ func (a *App) GetState() State {
 
 	// Calibration files.
 	files := map[string]*fmtdata.File{}
-	for _, c := range []*session.Cal{&s.CalBefore, &s.CalAfter} {
+	for _, c := range []*session.Cal{&s.CalBefore, &s.CalAfter, &s.PracticeCal} {
 		cv := CalView{ID: c.ID, Cal: *c}
-		cv.Title = map[string]string{"cal_before": "Calibration before the runs", "cal_after": "Calibration after the runs"}[c.ID]
+		cv.Title = map[string]string{"cal_before": "Calibration before the runs", "cal_after": "Calibration after the runs",
+			"practice_cal": "Practice calibration"}[c.ID]
 		if f, err := a.loadSlot(c.Slot); err != nil {
 			cv.Issues = append(cv.Issues, fmtdata.Issue{Level: "error", Msg: err.Error()})
 		} else if f != nil {
@@ -240,8 +243,12 @@ func (a *App) GetState() State {
 				}
 			}
 			if len(f.Lines) > 0 && ref*2 < len(f.Lines) {
-				cv.Issues = append(cv.Issues, fmtdata.Issue{Level: "error", Msg: "Most readings in this file are not on WWV/CHU frequencies. Is this a test-run file loaded into a calibration slot?"})
+				cv.Issues = append(cv.Issues, fmtdata.Issue{Level: "error", Msg: "Most readings in this file are not on WWV/WWVH frequencies. Is this a test-run file loaded into a calibration slot?"})
 			}
+		}
+		if c.ID == "practice_cal" {
+			st.PracticeCal = cv
+			continue
 		}
 		st.Cals = append(st.Cals, cv)
 	}
@@ -254,13 +261,13 @@ func (a *App) GetState() State {
 
 	// Runs.
 	for i := range s.Runs {
-		rv, f := a.runView(&s.Runs[i], false, before, after)
+		rv, f := a.runView(&s.Runs[i], false, before, after, nil)
 		if f != nil {
 			files[s.Runs[i].ID] = f
 		}
 		st.Runs = append(st.Runs, rv)
 	}
-	pv, pf := a.runView(&s.Practice, true, before, after)
+	pv, pf := a.runView(&s.Practice, true, before, after, st.PracticeCal.Result)
 	if pf != nil {
 		files["practice"] = pf
 	}
@@ -291,6 +298,9 @@ func (a *App) GetState() State {
 			pv.Issues = append(pv.Issues, fmtdata.Issue{Level: "error", Msg: msg})
 			pv.Ready = false
 		}
+		if contains(ids, "practice_cal") {
+			st.PracticeCal.Issues = append(st.PracticeCal.Issues, fmtdata.Issue{Level: "error", Msg: msg})
+		}
 	}
 	st.Practice = pv
 	for _, c := range st.Cals {
@@ -309,10 +319,19 @@ func (a *App) GetState() State {
 }
 
 // runView analyses one run (or the practice run) and returns it with the
-// parsed file.
-func (a *App) runView(r *session.Run, practice bool, before, after *fmtdata.CalResult) (RunView, *fmtdata.File) {
+// parsed file. pcal is the practice calibration: the practice run uses it
+// when it's usable, and the test-night calibrations otherwise.
+func (a *App) runView(r *session.Run, practice bool, before, after, pcal *fmtdata.CalResult) (RunView, *fmtdata.File) {
 	s := a.sess
 	calOK := func(c *fmtdata.CalResult) bool { return c != nil && c.OK && !fmtdata.HasErrors(c.Issues) }
+	mode, beforeName, beforeRef, afterRef := s.CalMode, "before", s.CalBefore.Slot.Ref, s.CalAfter.Slot.Ref
+	usePcal := practice && calOK(pcal)
+	if usePcal {
+		before, after, beforeName, beforeRef, afterRef = pcal, nil, "practice", s.PracticeCal.Slot.Ref, nil
+		if mode != "none" {
+			mode = "before"
+		}
+	}
 	rv := RunView{Run: *r, Title: r.Title(), CallUp: r.CallUp(), KeyUp: r.KeyUp(),
 		FileName: s.SlotFileName(r.ID), SuggestDialHz: math.Round(r.CarrierHz - 1500)}
 	f, err := a.loadSlot(r.Slot)
@@ -346,32 +365,52 @@ func (a *App) runView(r *session.Run, practice bool, before, after *fmtdata.CalR
 				v := after.Correction(fMHz)
 				rv.CorrAfter = &v
 			}
-			corr, cerr := pickCorrection(s.CalMode, rv.CorrBefore, rv.CorrAfter)
+			corr, cerr := pickCorrection(mode, rv.CorrBefore, rv.CorrAfter)
 			switch {
 			case cerr != "" && practice:
 				corr = 0
 				rv.CorrHz = &corr
-				rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "info", Msg: "No usable calibration in this session, so the practice result is not corrected for your radio's error."})
+				rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "info", Msg: "No usable calibration, so the practice result is not corrected for your radio's error. Capture a practice calibration on WWV first if you want it corrected."})
+			case practice && usePcal && mode != "none":
+				rv.CorrHz = &corr
+				rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "info", Msg: "Corrected with the practice calibration."})
+			case practice && mode != "none":
+				rv.CorrHz = &corr
+				rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "info", Msg: "Corrected with the test-night calibration, because there's no practice calibration."})
 			case cerr != "":
 				rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "error", Msg: cerr})
 			default:
 				rv.CorrHz = &corr
 			}
 			used := map[string]*session.RefRecord{}
-			if rv.CorrBefore != nil && (s.CalMode == "before" || s.CalMode == "average") {
-				used["before"] = s.CalBefore.Slot.Ref
+			if rv.CorrBefore != nil && (mode == "before" || mode == "average") {
+				used[beforeName] = beforeRef
 			}
-			if rv.CorrAfter != nil && (s.CalMode == "after" || s.CalMode == "average") {
-				used["after"] = s.CalAfter.Slot.Ref
+			if rv.CorrAfter != nil && (mode == "after" || mode == "average") {
+				used["after"] = afterRef
 			}
-			rv.Issues = append(rv.Issues, refRunIssues(r.Slot.Ref, s.CalMode, used)...)
+			var applied *float64
+			if mode != "none" && rv.CorrHz != nil && (rv.CorrBefore != nil || rv.CorrAfter != nil) {
+				applied = rv.CorrHz
+			}
+			rv.Issues = append(rv.Issues, refRunIssues(r.Slot.Ref, mode, used, applied)...)
 			if rv.CorrBefore != nil && rv.CorrAfter != nil && math.Abs(*rv.CorrBefore-*rv.CorrAfter) > 0.3 {
 				rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "warn", Msg: fmt.Sprintf(
 					"The before and after calibrations differ by %.2f Hz here, so the radio drifted. Averaging them is usually best.",
 					math.Abs(*rv.CorrBefore-*rv.CorrAfter))})
 			}
 			if r.DialHz > 0 && rv.CorrHz != nil {
-				v := r.DialHz + res.MeanFMeas - *rv.CorrHz
+				dial := r.DialHz
+				if e := sliceErrApplied(r); e != nil {
+					rv.SliceErrHz = e
+					dial += *e
+					rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "info", Msg: fmt.Sprintf(
+						"Includes the radio's slice tuning error, %+.1f mHz, read at key-down.", *e*1000)})
+				} else if r.SliceErrMHz != nil {
+					rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "info", Msg: fmt.Sprintf(
+						"The radio's slice tuning error was read on %s, not the dial you entered, so it isn't applied.", khzStr(float64(r.SliceErrDialHz)))})
+				}
+				v := dial + res.MeanFMeas - *rv.CorrHz
 				rv.FinalHz = &v
 				if math.Abs(v-r.NominalKHz*1000) > 1500 {
 					rv.Issues = append(rv.Issues, fmtdata.Issue{Level: "warn", Msg: fmt.Sprintf(
@@ -1125,9 +1164,16 @@ func (a *App) Report() (string, error) {
 				fmt.Fprintf(&b, "    Correction A+B*f %+.3f Hz\n", *r.CorrHz)
 			}
 			if r.FinalHz != nil {
-				fmt.Fprintf(&b, "    Carrier = dial + fMeas - correction = %.2f Hz\n", *r.FinalHz)
+				formula := "dial + fMeas - correction"
+				if r.SliceErrHz != nil {
+					formula = "dial + slice tuning error + fMeas - correction"
+				}
+				fmt.Fprintf(&b, "    Carrier = %s = %.2f Hz\n", formula, *r.FinalHz)
 			}
 			fmt.Fprintf(&b, "    Reference: %s\n", refReportLine(r.Run.Slot.Ref))
+			if r.SliceErrHz != nil {
+				fmt.Fprintf(&b, "    Slice tuning error %+.1f mHz (added to the dial)\n", *r.SliceErrHz*1000)
+			}
 		}
 		for _, is := range append(append([]fmtdata.Issue{}, r.Issues...), resIssues(r.Result)...) {
 			if is.Level != "info" {
@@ -1324,17 +1370,38 @@ func (a *App) onSliceFreq(letter string, hz int64) {
 }
 
 // NoteRadioDial records the radio's dial for a run (called at key-down).
+// It also reads the slice's tuning error, a few millihertz the radio adds to
+// the dial; that's read only, and changes after every retune.
 func (a *App) NoteRadioDial(id string) {
 	sl, err := a.flexSlice()
 	if err != nil {
 		return
 	}
+	errMHz, eerr := a.radio.SliceError(sl.Index, 3*time.Second)
+	if eerr != nil {
+		a.src.Warn("slice tuning error: %v", eerr)
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if r := a.sess.Run(id); r != nil {
 		r.RadioDialHz = sl.FreqHz
+		r.SliceErrMHz, r.SliceErrDialHz = nil, 0
+		if eerr == nil {
+			r.SliceErrMHz, r.SliceErrDialHz = &errMHz, sl.FreqHz
+			a.src.Info("%s: slice %s tuning error %+.3f mHz at %s", id, sl.Letter, errMHz, khzStr(float64(sl.FreqHz)))
+		}
 		a.saveLocked()
 	}
+}
+
+// sliceErrApplied is the slice tuning error, in Hz, to add to a run's dial:
+// only when it was read on the dial the operator entered.
+func sliceErrApplied(r *session.Run) *float64 {
+	if r.SliceErrMHz == nil || r.DialHz == 0 || r.SliceErrDialHz != int64(math.Round(r.DialHz)) {
+		return nil
+	}
+	v := *r.SliceErrMHz / 1000
+	return &v
 }
 
 // ---------------------------------------------------------------------------
@@ -1345,7 +1412,7 @@ func (a *App) allSlotIDs() []string {
 	for _, r := range a.sess.Runs {
 		ids = append(ids, r.ID)
 	}
-	return append(ids, "cal_after", "practice")
+	return append(ids, "cal_after", "practice_cal", "practice")
 }
 
 func (a *App) slotTitles(ids []string) []string {
@@ -1358,6 +1425,8 @@ func (a *App) slotTitles(ids []string) []string {
 			out = append(out, "Calibration after")
 		case "practice":
 			out = append(out, "Practice")
+		case "practice_cal":
+			out = append(out, "Practice calibration")
 		default:
 			if r := a.sess.Run(id); r != nil {
 				out = append(out, r.Title())

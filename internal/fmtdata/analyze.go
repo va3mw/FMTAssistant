@@ -32,11 +32,11 @@ type Reference struct {
 	Label string
 }
 
-// References are the time-and-frequency stations WSJT-X lists for FreqCal.
+// References are the WWV/WWVH frequencies used for FreqCal. CHU (3.330, 7.850 and
+// 14.670 MHz) no longer transmits, so readings there now count as non-reference.
 var References = []Reference{
 	{2500, "WWV 2.5 MHz"}, {5000, "WWV 5 MHz"}, {10000, "WWV 10 MHz"},
 	{15000, "WWV 15 MHz"}, {20000, "WWV 20 MHz"}, {25000, "WWV 25 MHz"},
-	{3330, "CHU 3.33 MHz"}, {7850, "CHU 7.85 MHz"}, {14670, "CHU 14.67 MHz"},
 }
 
 // LookupReference finds the reference station for a kHz column value.
@@ -130,7 +130,7 @@ func AnalyzeCal(f *File, opt CalOptions) *CalResult {
 		if ref, ok := LookupReference(khz); ok {
 			st.Label, st.IsRef = ref.Label, true
 		} else {
-			st.Label = fmt.Sprintf("%.3f MHz (not a WWV/CHU frequency)", float64(khz)/1000)
+			st.Label = fmt.Sprintf("%.3f MHz (not a WWV/WWVH frequency)", float64(khz)/1000)
 			nonRef++
 		}
 		var dfs []float64
@@ -174,7 +174,7 @@ func AnalyzeCal(f *File, opt CalOptions) *CalResult {
 	}
 	res.NFit = len(xs)
 	if nonRef > 0 {
-		res.Issues = append(res.Issues, infof("%d station(s) are not WWV/CHU and are excluded unless you include them.", nonRef))
+		res.Issues = append(res.Issues, infof("%d station(s) are not WWV/WWVH and are excluded unless you include them.", nonRef))
 	}
 	if res.NFit == 0 {
 		res.Issues = append(res.Issues, errorf("No usable calibration stations. Check the S/N limit and that the file is a WWV calibration run."))
@@ -249,7 +249,7 @@ type RunOptions struct {
 	// ForceWindow always keeps only readings inside the key-down window
 	// (practice on a continuous carrier, where the whole file is strong).
 	ForceWindow bool `json:"-"`
-	// AllowReference accepts a run measured on a WWV/CHU frequency.
+	// AllowReference accepts a run measured on a WWV/WWVH frequency.
 	AllowReference bool `json:"-"`
 }
 

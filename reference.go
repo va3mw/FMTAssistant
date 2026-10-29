@@ -176,8 +176,9 @@ func (a *App) recordRefLocked(sl *session.Slot, f *fmtdata.File) {
 }
 
 // refRunIssues checks a run's reference against the calibrations used to
-// correct it and the correction mode.
-func refRunIssues(run *session.RefRecord, mode string, cals map[string]*session.RefRecord) []fmtdata.Issue {
+// correct it and the correction mode. corr is the WWV correction applied, if
+// any.
+func refRunIssues(run *session.RefRecord, mode string, cals map[string]*session.RefRecord, corr *float64) []fmtdata.Issue {
 	var is []fmtdata.Issue
 	add := func(level, format string, args ...any) {
 		is = append(is, fmtdata.Issue{Level: level, Msg: fmt.Sprintf(format, args...)})
@@ -205,7 +206,12 @@ func refRunIssues(run *session.RefRecord, mode string, cals map[string]*session.
 	if run.Kind == session.RefGPS && !run.Locked && !run.Changed {
 		add("warn", "The GPS-disciplined reference wasn't locked while this run was measured. The WWV calibration corrects it only if it stayed steady; compare the before and after calibrations.")
 	}
-	for _, name := range []string{"before", "after"} {
+	// A locked GPS reference is good to far better than 0.01 Hz, while a WWV
+	// calibration carries WWV's own path Doppler: applying it makes things worse.
+	if run.Kind == session.RefGPS && run.Locked && !run.Changed && corr != nil {
+		add("warn", "This run was measured on a locked GPS-disciplined reference, which is already far more accurate than a WWV calibration. Applying the WWV correction (%+.3f Hz here) adds WWV's own path Doppler instead of removing an error: choose No correction on the Calibration tab.", *corr)
+	}
+	for _, name := range []string{"before", "after", "practice"} {
 		c := cals[name]
 		if c == nil || c.Kind == run.Kind {
 			continue
@@ -226,8 +232,8 @@ func refCalIssues(rec *session.RefRecord, res *fmtdata.CalResult) []fmtdata.Issu
 		is = append(is, fmtdata.Issue{Level: "error", Msg: fmt.Sprintf(
 			"The radio's frequency reference changed during this calibration (%s), so its stations don't share one error. Calibrate again.", rec.Detail)})
 	}
-	// A locked GPS reference leaves almost nothing to calibrate, so a large
-	// correction points at something else.
+	// A locked GPS reference leaves almost nothing to calibrate: what a WWV
+	// calibration measures then is WWV's path Doppler, or a setup fault.
 	if rec.Kind == session.RefGPS && rec.Locked && !rec.Changed && res != nil && res.OK {
 		worst, at := 0.0, 0
 		for _, st := range res.Stations {
@@ -235,11 +241,16 @@ func refCalIssues(rec *session.RefRecord, res *fmtdata.CalResult) []fmtdata.Issu
 				worst, at = c, st.KHz
 			}
 		}
-		if worst > 0.3 {
-			is = append(is, fmtdata.Issue{Level: "warn", Msg: fmt.Sprintf(
-				"Your reference is GPS-locked, so this calibration should be close to zero, but it puts the radio %.2f Hz off at %s. Check that WSJT-X's own calibration is zero (Settings > Frequencies) and look at the WWV readings; or the reference isn't what it seems.",
-				worst, khzStr(float64(at)*1000))})
+		var level, msg string
+		switch {
+		case worst > 0.3:
+			level, msg = "warn", fmt.Sprintf("Your reference is GPS-locked, so this calibration should be close to zero, but it puts the radio %.2f Hz off at %s. That's more than WWV's path Doppler: check that WSJT-X's own calibration is zero (Settings > Frequencies), look at the WWV readings, and check the radio really is on its GPSDO.", worst, khzStr(float64(at)*1000))
+		case worst > 0.03:
+			level, msg = "info", fmt.Sprintf("Your reference is GPS-locked, so this calibration (up to %.3f Hz at %s) is measuring WWV's path Doppler, not your radio. Use it only as a check, and choose No correction for the runs.", worst, khzStr(float64(at)*1000))
+		default:
+			level, msg = "info", fmt.Sprintf("Your reference is GPS-locked and WWV agrees within %.3f Hz: the whole chain checks out. Choose No correction for the runs.", worst)
 		}
+		is = append(is, fmtdata.Issue{Level: level, Msg: msg})
 	}
 	return is
 }

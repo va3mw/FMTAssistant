@@ -104,27 +104,30 @@ func TestRefRunIssues(t *testing.T) {
 	tcxo := &session.RefRecord{Kind: session.RefInternal, Locked: true, From: "radio"}
 	tcxoSetup := &session.RefRecord{Kind: session.RefInternal, Locked: true, From: "setup"}
 	changed := &session.RefRecord{Kind: session.RefGPS, Changed: true, From: "radio", Detail: "GPSDO, locked → TCXO"}
+	corr := 0.12
 	cases := []struct {
 		name string
 		run  *session.RefRecord
 		mode string
 		cals map[string]*session.RefRecord
+		corr *float64
 		want string
 	}{
-		{"same reference", tcxo, "average", map[string]*session.RefRecord{"before": tcxo, "after": tcxo}, ""},
-		{"cal on another reference", tcxo, "average", map[string]*session.RefRecord{"before": gps, "after": tcxo}, "error"},
-		{"no record on the cal", tcxo, "before", map[string]*session.RefRecord{"before": nil}, ""},
-		{"none on GPS locked", gps, "none", nil, ""},
-		{"none on TCXO from radio", tcxo, "none", nil, "error"},
-		{"none on internal from Setup", tcxoSetup, "none", nil, "warn"},
-		{"none on unlocked GPSDO", gpsUnl, "none", nil, "error"},
-		{"calibrated, unlocked GPSDO", gpsUnl, "before", map[string]*session.RefRecord{"before": gps}, "warn"},
-		{"changed during the run", changed, "before", map[string]*session.RefRecord{"before": gps}, "error"},
-		{"loaded file, calibrated", nil, "average", nil, ""},
-		{"loaded file, no correction", nil, "none", nil, "info"},
+		{"same reference", tcxo, "average", map[string]*session.RefRecord{"before": tcxo, "after": tcxo}, &corr, ""},
+		{"cal on another reference", tcxo, "average", map[string]*session.RefRecord{"before": gps, "after": tcxo}, &corr, "error"},
+		{"no record on the cal", tcxo, "before", map[string]*session.RefRecord{"before": nil}, &corr, ""},
+		{"none on GPS locked", gps, "none", nil, nil, ""},
+		{"none on TCXO from radio", tcxo, "none", nil, nil, "error"},
+		{"none on internal from Setup", tcxoSetup, "none", nil, nil, "warn"},
+		{"none on unlocked GPSDO", gpsUnl, "none", nil, nil, "error"},
+		{"calibrated, unlocked GPSDO", gpsUnl, "before", map[string]*session.RefRecord{"before": gps}, &corr, "warn"},
+		{"WWV correction on a locked GPSDO", gps, "average", map[string]*session.RefRecord{"before": gps, "after": gps}, &corr, "warn"},
+		{"changed during the run", changed, "before", map[string]*session.RefRecord{"before": gps}, &corr, "error"},
+		{"loaded file, calibrated", nil, "average", nil, &corr, ""},
+		{"loaded file, no correction", nil, "none", nil, nil, "info"},
 	}
 	for _, c := range cases {
-		if got := levels(refRunIssues(c.run, c.mode, c.cals)); got != c.want {
+		if got := levels(refRunIssues(c.run, c.mode, c.cals, c.corr)); got != c.want {
 			t.Errorf("%s: got %q want %q", c.name, got, c.want)
 		}
 	}
@@ -135,8 +138,13 @@ func TestRefCalIssues(t *testing.T) {
 	res := func(a, b float64) *fmtdata.CalResult {
 		return &fmtdata.CalResult{OK: true, A: a, B: b, Stations: []fmtdata.CalStation{{KHz: 5000, Included: true}, {KHz: 15000, Included: true}}}
 	}
-	if is := refCalIssues(gps, res(0.02, 0.005)); len(is) != 0 {
-		t.Errorf("small fit on GPS: %+v", is)
+	// On a locked GPS reference a WWV calibration only ever informs: it agrees,
+	// or it shows WWV's path Doppler; a large one points at a setup fault.
+	if is := refCalIssues(gps, res(0.002, 0.0005)); levels(is) != "info" || !strings.Contains(is[0].Msg, "agrees") {
+		t.Errorf("tiny fit on GPS (0.0095 Hz at 15 MHz): %+v", is)
+	}
+	if is := refCalIssues(gps, res(0.02, 0.005)); levels(is) != "info" || !strings.Contains(is[0].Msg, "Doppler") {
+		t.Errorf("small fit on GPS (0.095 Hz at 15 MHz): %+v", is)
 	}
 	if is := refCalIssues(gps, res(0.1, 0.05)); levels(is) != "warn" {
 		t.Errorf("large fit on GPS (0.85 Hz at 15 MHz): %+v", is)
@@ -184,5 +192,21 @@ func TestFlexRefIssues(t *testing.T) {
 	}
 	if is := flexRefIssues(flex.Reference{}, false, now); len(is) != 0 {
 		t.Errorf("unknown reference: %+v", is)
+	}
+}
+
+func TestSliceErrApplied(t *testing.T) {
+	e := 3.8
+	r := session.Run{DialHz: 7062500, SliceErrMHz: &e, SliceErrDialHz: 7062500}
+	if got := sliceErrApplied(&r); got == nil || *got != 0.0038 {
+		t.Fatalf("same dial: %v", got)
+	}
+	r.DialHz = 7062510 // the dial entered differs from the one it was read on
+	if got := sliceErrApplied(&r); got != nil {
+		t.Fatalf("other dial: %v", *got)
+	}
+	r.DialHz, r.SliceErrMHz = 7062500, nil
+	if got := sliceErrApplied(&r); got != nil {
+		t.Fatalf("not read: %v", *got)
 	}
 }
