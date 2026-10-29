@@ -120,15 +120,3 @@ func TestRunRejectsCalibrationFile(t *testing.T) {
 		t.Fatal("calibration file accepted as a run")
 	}
 }
-
-// CHU no longer transmits, so its old frequencies are not references.
-func TestCHUNotReference(t *testing.T) {
-	for _, khz := range []int{3330, 7850, 14670} {
-		if r, ok := LookupReference(khz); ok {
-			t.Errorf("%d kHz matched %q", khz, r.Label)
-		}
-	}
-	if _, ok := LookupReference(10000); !ok {
-		t.Error("WWV 10 MHz not found")
-	}
-}

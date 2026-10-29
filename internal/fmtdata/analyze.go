@@ -32,8 +32,7 @@ type Reference struct {
 	Label string
 }
 
-// References are the WWV/WWVH frequencies used for FreqCal. CHU (3.330, 7.850 and
-// 14.670 MHz) no longer transmits, so readings there now count as non-reference.
+// References are the WWV/WWVH frequencies used for FreqCal.
 var References = []Reference{
 	{2500, "WWV 2.5 MHz"}, {5000, "WWV 5 MHz"}, {10000, "WWV 10 MHz"},
 	{15000, "WWV 15 MHz"}, {20000, "WWV 20 MHz"}, {25000, "WWV 25 MHz"},
