@@ -24,6 +24,27 @@ type Slice struct {
 	RITOn        bool   `json:"rit_on"`
 	RITFreq      int    `json:"rit_freq"`
 	DiguOffset   int    `json:"digu_offset"`
+	Pan          uint32 `json:"pan"` // the panadapter the slice is shown on
+}
+
+// Pan mirrors a panadapter's status. Its DAX IQ stream, when there is one, is
+// centred on CenterHz.
+type Pan struct {
+	ID           uint32  `json:"id"`
+	CenterHz     float64 `json:"center_hz"`
+	BandwidthHz  float64 `json:"bandwidth_hz"`
+	DAXIQChannel int     `json:"daxiq_channel"`
+	ClientHandle uint32  `json:"client_handle"`
+}
+
+// Stream mirrors a stream's status ("stream 0x... type=dax_iq ...").
+type Stream struct {
+	ID           uint32 `json:"id"`
+	Type         string `json:"type"`
+	DAXIQChannel int    `json:"daxiq_channel"`
+	Pan          uint32 `json:"pan"`
+	Rate         int    `json:"daxiq_rate"`
+	ClientHandle uint32 `json:"client_handle"`
 }
 
 // Station is a GUI client (SmartSDR, Maestro, ...) connected to the radio.
@@ -65,7 +86,18 @@ type Snapshot struct {
 	BoundStation string    `json:"bound_station"`
 	BoundHandle  uint32    `json:"bound_handle"`
 	Slices       []Slice   `json:"slices"`
+	Pans         []Pan     `json:"pans"`
 	Ref          Reference `json:"ref"`
+}
+
+// PanByID finds a panadapter by its ID.
+func (s *Snapshot) PanByID(id uint32) (Pan, bool) {
+	for _, p := range s.Pans {
+		if p.ID == id {
+			return p, true
+		}
+	}
+	return Pan{}, false
 }
 
 // SliceByLetter finds an in-use slice owned by the bound station.
@@ -105,6 +137,8 @@ type Radio struct {
 	pending     map[uint32]replyFn
 	myHandle    uint32
 	slices      map[int]*Slice
+	pans        map[uint32]*Pan
+	streams     map[uint32]*Stream
 	stations    map[uint32]*Station
 	wantStation string
 	boundHandle uint32
@@ -189,6 +223,8 @@ func (r *Radio) session(ip string, stop chan struct{}) error {
 	r.conn = conn
 	r.pending = map[uint32]replyFn{}
 	r.slices = map[int]*Slice{}
+	r.pans = map[uint32]*Pan{}
+	r.streams = map[uint32]*Stream{}
 	r.stations = map[uint32]*Station{}
 	r.boundHandle, r.boundName, r.myHandle = 0, "", 0
 	r.ref = Reference{}
@@ -271,6 +307,9 @@ func (r *Radio) handleLine(line string) {
 		}
 		// GPS status is only for display; a radio without GPS may refuse it.
 		r.Command("sub gps all", func(uint32, string) {})
+		// Panadapter and DAX IQ stream status, for IQ recording.
+		r.Command("sub pan all", r.quietFail("sub pan all"))
+		r.Command("sub daxiq all", r.quietFail("sub daxiq all"))
 		r.Command("info", r.onInfo)
 		r.notify()
 	case 'R':
@@ -335,6 +374,15 @@ func ParseInfo(s string) map[string]string {
 		}
 	}
 	return m
+}
+
+// quietFail returns a reply callback that logs a refusal at debug level only.
+func (r *Radio) quietFail(cmd string) replyFn {
+	return func(code uint32, msg string) {
+		if code != 0 {
+			r.log.Debug("radio refused %q (0x%08X %s)", cmd, code, msg)
+		}
+	}
 }
 
 // Command sends an API command. cb (optional) receives the reply. Failures are
@@ -415,6 +463,21 @@ func (r *Radio) handleStatus(body string) bool {
 		}
 		r.mu.Unlock()
 		return true
+	case "display":
+		// display pan 0x40000000 center=7.0625 bandwidth=0.2 daxiq_channel=1 ...
+		if len(fields) >= 3 && (fields[1] == "pan" || fields[1] == "panafall") {
+			if id, err := parseHex32(fields[2]); err == nil {
+				r.applyPan(id, ParseKV(strings.Join(fields[3:], " ")))
+			}
+		}
+		return false // the UI doesn't show pans
+	case "stream":
+		if len(fields) >= 2 {
+			if id, err := parseHex32(fields[1]); err == nil {
+				r.applyStream(id, ParseKV(strings.Join(fields[2:], " ")))
+			}
+		}
+		return false
 	case "gps":
 		// gps lat=..#lon=..#freq_error=..#status=..#time=..; values may hold spaces.
 		r.applyGPS(strings.TrimSpace(strings.TrimPrefix(body, "gps")))
@@ -510,6 +573,8 @@ func (r *Radio) applySlice(idx int, kv map[string]string) {
 			s.RITFreq, _ = strconv.Atoi(v)
 		case "digu_offset":
 			s.DiguOffset, _ = strconv.Atoi(v)
+		case "pan":
+			s.Pan, _ = parseHex32(v)
 		}
 	}
 	letter, hz := s.Letter, s.FreqHz
@@ -521,6 +586,82 @@ func (r *Radio) applySlice(idx int, kv map[string]string) {
 	if cb != nil && hz != prevHz && letter != "" {
 		cb(letter, hz)
 	}
+}
+
+func (r *Radio) applyPan(id uint32, kv map[string]string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, gone := kv["removed"]; gone {
+		delete(r.pans, id)
+		return
+	}
+	p := r.pans[id]
+	if p == nil {
+		p = &Pan{ID: id}
+		r.pans[id] = p
+	}
+	for k, v := range kv {
+		switch k {
+		case "center":
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				p.CenterHz = f * 1e6
+			}
+		case "bandwidth":
+			if f, err := strconv.ParseFloat(v, 64); err == nil {
+				p.BandwidthHz = f * 1e6
+			}
+		case "daxiq_channel", "daxiq":
+			p.DAXIQChannel, _ = strconv.Atoi(v)
+		case "client_handle":
+			p.ClientHandle, _ = parseHex32(v)
+		}
+	}
+}
+
+func (r *Radio) applyStream(id uint32, kv map[string]string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, gone := kv["removed"]; gone {
+		delete(r.streams, id)
+		return
+	}
+	st := r.streams[id]
+	if st == nil {
+		st = &Stream{ID: id}
+		r.streams[id] = st
+	}
+	for k, v := range kv {
+		switch k {
+		case "type":
+			st.Type = v
+		case "daxiq_channel":
+			st.DAXIQChannel, _ = strconv.Atoi(v)
+		case "pan":
+			st.Pan, _ = parseHex32(v)
+		case "daxiq_rate":
+			st.Rate, _ = strconv.Atoi(v)
+		case "client_handle":
+			st.ClientHandle, _ = parseHex32(v)
+		}
+	}
+}
+
+// stream returns a copy of a stream's last status.
+func (r *Radio) stream(id uint32) (Stream, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if st := r.streams[id]; st != nil {
+		return *st, true
+	}
+	return Stream{}, false
+}
+
+// parseHex32 reads "0x40000000" or "40000000".
+func parseHex32(s string) (uint32, error) {
+	s = strings.TrimSpace(s)
+	s = strings.TrimPrefix(strings.TrimPrefix(s, "0x"), "0X")
+	v, err := strconv.ParseUint(s, 16, 32)
+	return uint32(v), err
 }
 
 func (r *Radio) applyClient(h uint32, state string, kv map[string]string) {
@@ -623,11 +764,21 @@ func (r *Radio) Snapshot() Snapshot {
 		s.Slices = append(s.Slices, *sl)
 	}
 	sort.Slice(s.Slices, func(i, j int) bool { return s.Slices[i].Index < s.Slices[j].Index })
+	for _, p := range r.pans {
+		s.Pans = append(s.Pans, *p)
+	}
+	sort.Slice(s.Pans, func(i, j int) bool { return s.Pans[i].ID < s.Pans[j].ID })
 	return s
 }
 
 // CommandWait sends cmd and waits for the radio's reply.
 func (r *Radio) CommandWait(cmd string, timeout time.Duration) error {
+	_, err := r.CommandReply(cmd, timeout)
+	return err
+}
+
+// CommandReply sends cmd, waits for the radio's reply and returns its text.
+func (r *Radio) CommandReply(cmd string, timeout time.Duration) (string, error) {
 	type reply struct {
 		code uint32
 		msg  string
@@ -637,11 +788,11 @@ func (r *Radio) CommandWait(cmd string, timeout time.Duration) error {
 	select {
 	case rep := <-ch:
 		if rep.code != 0 {
-			return fmt.Errorf("radio refused %q (0x%08X %s)", cmd, rep.code, rep.msg)
+			return rep.msg, fmt.Errorf("radio refused %q (0x%08X %s)", cmd, rep.code, rep.msg)
 		}
-		return nil
+		return rep.msg, nil
 	case <-time.After(timeout):
-		return fmt.Errorf("no reply from the radio to %q", cmd)
+		return "", fmt.Errorf("no reply from the radio to %q", cmd)
 	}
 }
 
