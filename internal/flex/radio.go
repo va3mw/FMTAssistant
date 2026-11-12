@@ -24,6 +24,17 @@ type Slice struct {
 	RITOn        bool   `json:"rit_on"`
 	RITFreq      int    `json:"rit_freq"`
 	DiguOffset   int    `json:"digu_offset"`
+	Pan          string `json:"pan"` // panadapter stream ID, e.g. 0x40000000
+}
+
+// Pan mirrors a panadapter's status. A DAX IQ stream carries the whole
+// panadapter, centred on CenterHz.
+type Pan struct {
+	ID           string `json:"id"`
+	CenterHz     int64  `json:"center_hz"`
+	BandwidthHz  int64  `json:"bandwidth_hz"`
+	DAXIQChannel int    `json:"daxiq_channel"`
+	ClientHandle uint32 `json:"client_handle"`
 }
 
 // Station is a GUI client (SmartSDR, Maestro, ...) connected to the radio.
@@ -65,6 +76,7 @@ type Snapshot struct {
 	BoundStation string    `json:"bound_station"`
 	BoundHandle  uint32    `json:"bound_handle"`
 	Slices       []Slice   `json:"slices"`
+	Pans         []Pan     `json:"pans"`
 	Ref          Reference `json:"ref"`
 }
 
@@ -95,6 +107,10 @@ type Radio struct {
 	// OnReference (optional) is told when the reference in use or its lock
 	// state changes.
 	OnReference func(Reference)
+	// OnPan (optional) is told about every panadapter status.
+	OnPan func(Pan)
+	// OnStream (optional) is told about every stream status (key=value).
+	OnStream func(id uint32, kv map[string]string)
 
 	mu          sync.Mutex
 	conn        net.Conn
@@ -105,6 +121,8 @@ type Radio struct {
 	pending     map[uint32]replyFn
 	myHandle    uint32
 	slices      map[int]*Slice
+	pans        map[string]*Pan
+	udpPort     int // UDP port told to the radio for this connection (0: not yet)
 	stations    map[uint32]*Station
 	wantStation string
 	boundHandle uint32
@@ -189,6 +207,8 @@ func (r *Radio) session(ip string, stop chan struct{}) error {
 	r.conn = conn
 	r.pending = map[uint32]replyFn{}
 	r.slices = map[int]*Slice{}
+	r.pans = map[string]*Pan{}
+	r.udpPort = 0
 	r.stations = map[uint32]*Station{}
 	r.boundHandle, r.boundName, r.myHandle = 0, "", 0
 	r.ref = Reference{}
@@ -271,6 +291,9 @@ func (r *Radio) handleLine(line string) {
 		}
 		// GPS status is only for display; a radio without GPS may refuse it.
 		r.Command("sub gps all", func(uint32, string) {})
+		// Panadapters and streams are needed only to record IQ.
+		r.Command("sub pan all", func(uint32, string) {})
+		r.Command("sub daxiq all", func(uint32, string) {})
 		r.Command("info", r.onInfo)
 		r.notify()
 	case 'R':
@@ -415,6 +438,26 @@ func (r *Radio) handleStatus(body string) bool {
 		}
 		r.mu.Unlock()
 		return true
+	case "display":
+		if len(fields) >= 3 && fields[1] == "pan" {
+			r.applyPan(strings.ToLower(fields[2]), ParseKV(strings.Join(fields[3:], " ")))
+			return true
+		}
+		return false
+	case "stream":
+		if len(fields) >= 2 {
+			id, err := strconv.ParseUint(strings.TrimPrefix(strings.ToLower(fields[1]), "0x"), 16, 32)
+			if err == nil {
+				kv := ParseKV(strings.Join(fields[2:], " "))
+				r.mu.Lock()
+				cb := r.OnStream
+				r.mu.Unlock()
+				if cb != nil {
+					cb(uint32(id), kv)
+				}
+			}
+		}
+		return false
 	case "gps":
 		// gps lat=..#lon=..#freq_error=..#status=..#time=..; values may hold spaces.
 		r.applyGPS(strings.TrimSpace(strings.TrimPrefix(body, "gps")))
@@ -510,6 +553,8 @@ func (r *Radio) applySlice(idx int, kv map[string]string) {
 			s.RITFreq, _ = strconv.Atoi(v)
 		case "digu_offset":
 			s.DiguOffset, _ = strconv.Atoi(v)
+		case "pan":
+			s.Pan = strings.ToLower(v)
 		}
 	}
 	letter, hz := s.Letter, s.FreqHz
@@ -623,6 +668,10 @@ func (r *Radio) Snapshot() Snapshot {
 		s.Slices = append(s.Slices, *sl)
 	}
 	sort.Slice(s.Slices, func(i, j int) bool { return s.Slices[i].Index < s.Slices[j].Index })
+	for _, p := range r.pans {
+		s.Pans = append(s.Pans, *p)
+	}
+	sort.Slice(s.Pans, func(i, j int) bool { return s.Pans[i].ID < s.Pans[j].ID })
 	return s
 }
 

@@ -350,6 +350,43 @@ frequency and mode.
 Warnings in the Flex panel tell you if the slice is not in DIGU, RIT is on, or a
 DIGU offset is set.
 
+#### IQ recording (optional, for analysis later)
+
+With a FlexRadio, the app can record the radio's IQ for the same frequency, at the
+same time WSJT-X is measuring, so you can analyse the carrier afterwards with
+other tools (Python, GNU Radio, Inspectrum, HDSDR, SDR#...).
+
+1. In the FlexRadio card, under **IQ recording**, tick **Record the IQ of the
+   slice's panadapter during each step**.
+2. Choose a **DAX IQ channel** (1 to 4) that SmartSDR's DAX panel isn't using, and a
+   **rate**. 24 kHz is plenty for one carrier and takes about 11 MB a minute; 192 kHz
+   takes about 88 MB a minute.
+3. Press **Record IQ now** to try it: the card shows seconds, size and packets. If
+   the packet count stays at 0, allow FMT Assistant through Windows Firewall on
+   private networks (the IQ arrives as UDP from the radio). Press **Stop IQ
+   recording** when done.
+
+From then on a recording runs for each step the app follows live (each calibration,
+each run from call-up to just after key-up, and practice), and the live preview
+shows an **● IQ** tag with the seconds recorded. A recording never changes the answer.
+
+DAX IQ carries the whole **panadapter** around its centre, not just the slice, so a
+signal at RF frequency *f* sits at *f − centre* in the recording. If the slice is
+outside the recorded band when a step starts (or when the dial moves), the app
+re-centres the panadapter on the dial. If the panadapter has no DAX IQ channel, the
+app gives it the one you chose and removes it again afterwards.
+
+Each recording is a pair of files in the session's `IQ` folder:
+
+- `<step> <UTC start> <dial> kHz.wav`: 2 channels of 32-bit float, left I, right Q,
+  at the stream's sample rate. It has an `auxi` chunk (the HDSDR / SDR# layout) with
+  the centre frequency and start time.
+- the same name with `.json`: centre and dial frequencies, expected carrier and its
+  offset from the centre, sample rate (and whether the radio reported it or it was
+  measured), the radio's first VITA-49 timestamp, host start and stop times, the
+  frequency reference, lost packets and where they were, and every centre or dial
+  change with the sample (frame) where it happened.
+
 ## Step 2: Practice (Practice tab)
 
 Practise the whole process at least once before the real test. Practice FMTs are
@@ -820,6 +857,7 @@ messages are warnings worth a look. **Blue** messages are information.
 | `2_run1_W8RKO40m.all` … `5_run4_K5CM80m.all` | The four runs (names follow your schedule) |
 | `6_calibration_after.all` | Calibration after the runs |
 | `session.json` | Your schedule, dial entries, choices and settings |
+| `IQ\<step> <UTC time> <dial> kHz.wav` and `.json` | FlexRadio IQ recordings and their description, if IQ recording is on |
 | `FMT results.txt` | The report, written when you press Save report |
 | `FMT AI prompt.txt` | The AI prompt, written when you press Copy AI prompt or Show prompt |
 | `*-replaced-*.all`, `*-removed-*.all` | Earlier files kept when you replace or remove one |
@@ -1046,7 +1084,9 @@ Personalization > Colors).
 | `outcome.go` | Comparison with the published frequencies, and the AI prompt |
 | `internal/fmtdata` | `fmt.all` parser, live follower, calibration fit, run analysis, and tests |
 | `internal/session` | The session (schedule, slots, settings), saved as `session.json` |
-| `internal/flex` | FlexRadio LAN discovery and SmartSDR API client (slice status, DIGU tune) |
+| `internal/flex` | FlexRadio LAN discovery and SmartSDR API client (slice and panadapter status, DIGU tune, DAX IQ stream) |
+| `internal/iq` | VITA-49 parsing, IQ WAV writer and recording metadata, and tests |
+| `iqrec.go` | Starts and stops IQ recording with each live step |
 | `internal/speech` | Windows SAPI voice |
 | `internal/logx` | Logger (daily log file) |
 | `frontend/dist/index.html` | The whole user interface |

@@ -51,3 +51,34 @@ func TestParseSliceError(t *testing.T) {
 		t.Fatal("garbage accepted")
 	}
 }
+
+func TestPanAndSlicePan(t *testing.T) {
+	l := logx.New(t.TempDir())
+	defer l.Close()
+	r := NewRadio(l, nil)
+	r.pans, r.slices = map[string]*Pan{}, map[int]*Slice{}
+	r.handleLine("S12345678|display pan 0x40000000 center=7.064000 bandwidth=0.200000 daxiq_channel=1 client_handle=0x1234")
+	r.handleLine("S12345678|slice 0 in_use=1 RF_frequency=7.062500 mode=DIGU index_letter=A pan=0x40000000 client_handle=0x1234")
+	p, ok := r.Pan("0x40000000")
+	if !ok || p.CenterHz != 7064000 || p.BandwidthHz != 200000 || p.DAXIQChannel != 1 || p.ClientHandle != 0x1234 {
+		t.Fatalf("pan %+v %v", p, ok)
+	}
+	if s := r.Snapshot(); len(s.Slices) != 1 || s.Slices[0].Pan != "0x40000000" || len(s.Pans) != 1 {
+		t.Fatalf("snapshot %+v", s)
+	}
+	r.handleLine("S12345678|display pan 0x40000000 removed")
+	if _, ok := r.Pan("0x40000000"); ok {
+		t.Fatal("pan not removed")
+	}
+}
+
+func TestParseStreamID(t *testing.T) {
+	for in, want := range map[string]uint32{"20000000": 0x20000000, "0x20000001": 0x20000001, "stream_id=0x2000000A": 0x2000000A} {
+		if got, err := ParseStreamID(in); err != nil || got != want {
+			t.Errorf("ParseStreamID(%q)=%x %v", in, got, err)
+		}
+	}
+	if _, err := ParseStreamID(""); err == nil {
+		t.Error("empty reply accepted")
+	}
+}

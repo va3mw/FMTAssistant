@@ -91,6 +91,11 @@ type Flex struct {
 	Station  string `json:"station"`
 	Slice    string `json:"slice"`     // slice letter
 	AutoTune bool   `json:"auto_tune"` // tune at call-up
+	// RecordIQ records the slice's panadapter as DAX IQ while each step is
+	// followed live, for later analysis. It never changes the answer.
+	RecordIQ  bool `json:"record_iq"`
+	IQChannel int  `json:"iq_channel"` // DAX IQ channel 1..4 to use if the panadapter has none
+	IQRate    int  `json:"iq_rate"`    // 24000, 48000, 96000 or 192000
 }
 
 type Session struct {
@@ -156,6 +161,7 @@ func Default() *Session {
 		Voice:       true,
 		Volume:      100,
 		Beeps:       true,
+		Flex:        Flex{IQChannel: 1, IQRate: 24000},
 	}
 }
 

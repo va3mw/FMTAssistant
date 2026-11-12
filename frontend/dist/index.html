@@ -814,7 +814,7 @@ function liveRun(rv){
 }
 function liveBlock(rv, w){
   const x=liveRun(rv), n=x.st.n;
-  return `<div class="livebox"><div class="row"><span class="tag">Live preview</span>
+  return `<div class="livebox"><div class="row"><span class="tag">Live preview</span>${iqBadge()}
       <span class="hint grow">Following fmt.all (${L.lines.length} line${L.lines.length===1?'':'s'}). Not the value to submit: press Capture, and the answer comes from the captured file.</span></div>
     <div class="lstats">
       <div><div class="hint">Good readings</div><div class="v">${n}</div></div>
@@ -864,7 +864,7 @@ function calLiveBlock(c){
     if(sd.two||sd.jumps>1) w.push({level:'warn', msg:`${s.label}: readings jump or split into two groups. Fading, QRM, or another station on frequency.`});
   }
   const nf=sts.filter(s=>s.included).length;
-  return `<div class="livebox"><div class="row"><span class="tag">Live preview</span>
+  return `<div class="livebox"><div class="row"><span class="tag">Live preview</span>${iqBadge()}
       <span class="hint grow">Following fmt.all (${L.lines.length} lines). The calibration used for the answers comes from the captured file.</span></div>
     <div class="lstats"><div><div class="hint">Stations in the fit</div><div class="v">${nf}</div></div>
       <div><div class="hint">Slope B</div><div class="v">${fit&&nf>1? fit.b.toFixed(4)+' ppm':'-'}</div></div>
@@ -1192,10 +1192,38 @@ function flexSetup(f){
       <h3>Quick tune (DIGU, dial 1500 Hz below)</h3><div class="row">
       ${[2500,5000,10000,15000,20000].map(k=>`<button class="small" onclick="tuneTo(${k*1000-1500})">WWV ${k/1000}</button>`).join('')}
       ${S.runs.map(rv=>`<button class="small" onclick="tuneRun('${rv.run.id}')">${esc(rv.title)}</button>`).join('')}</div>
-      <div class="hint" style="margin-top:6px">Setting the radio also turns RIT off and sets the DIGU offset to 0, so the slice frequency is the true dial.</div>`;
+      <div class="hint" style="margin-top:6px">Setting the radio also turns RIT off and sets the DIGU offset to 0, so the slice frequency is the true dial.</div>
+      ${iqSetup(f)}`;
   }
   return h+issuesHTML(f.issues);
 }
+// IQ recording (DAX IQ of the slice's panadapter, for analysis afterwards).
+function iqBadge(){
+  const q=S&&S.flex&&S.flex.iq;
+  if(!q||!q.recording) return '';
+  return ` <span class="tag" title="${esc(q.status.file)}">● IQ ${q.status.seconds.toFixed(0)} s${q.status.lost?' · '+q.status.lost+' lost':''}</span>`;
+}
+function iqMB(b){ return (b/1048576).toFixed(b<1048576*10?1:0)+' MB' }
+function iqSetup(f){
+  const s=S.session.flex, q=f.iq||{}, st=q.status||{}, rate=s.iq_rate||24000, ch=s.iq_channel||1;
+  const mbMin=(rate*8*60/1048576).toFixed(0);
+  let h=`<h3>IQ recording (for analysis later)</h3>
+    <label class="chk"><input type="checkbox" ${s.record_iq?'checked':''} onchange="call('SetIQRecord',this.checked)"> Record the IQ of the slice's panadapter during each step, while it is followed live</label>
+    <div class="row" style="margin-top:6px"><span class="hint">DAX IQ channel</span>
+      <select id="iqCh" onchange="iqOpts()">${[1,2,3,4].map(c=>`<option ${c===ch?'selected':''}>${c}</option>`).join('')}</select>
+      <span class="hint">rate</span>
+      <select id="iqRate" onchange="iqOpts()">${[24000,48000,96000,192000].map(r=>`<option value="${r}" ${r===rate?'selected':''}>${r/1000} kHz</option>`).join('')}</select>
+      <span class="hint">about ${mbMin} MB a minute</span></div>
+    <div class="row" style="margin-top:6px">
+      ${q.recording? (q.manual?`<button onclick="call('StopIQ')">Stop IQ recording</button>`:'') : `<button onclick="call('StartIQ')">Record IQ now</button>`}
+      <button onclick="call('OpenIQFolder')">Open IQ folder</button></div>`;
+  if(q.recording) h+=`<div class="kv" style="margin-top:8px"><b>Recording</b><span><span class="status ok">${esc(q.step)}</span> ${st.seconds.toFixed(0)} s, ${iqMB(st.bytes)}, ${st.rate/1000} kHz, ${st.packets} packets${st.lost?', <b>'+st.lost+' lost</b>':''}</span>
+      <b>Centre</b><span class="mono">${fmtKHz(q.center_hz)}</span><b>File</b><span class="mono">${esc(st.file)}</span></div>`;
+  else if(q.last) h+=`<div class="kv" style="margin-top:8px"><b>Last</b><span>${esc(q.last.step)}: ${q.last.seconds.toFixed(0)} s, ${iqMB(q.last.bytes)}, ${q.last.rate/1000} kHz${q.last.lost?', '+q.last.lost+' packets lost':''}${q.last.err?' · '+esc(q.last.err):''}</span>
+      <b>File</b><span class="mono">${esc(q.last.file)}</span></div>`;
+  return h+`<div class="hint" style="margin-top:6px">The IQ covers the panadapter around its centre, so the carrier is at its RF frequency minus the centre. If the slice is outside the recorded band the panadapter is re-centred on the dial. Each WAV (left I, right Q, 32-bit float) has a .json beside it with the centre, dial, rate, timing, lost packets and every centre or dial change. Recording never changes the answer, and the app still never transmits.</div>`;
+}
+async function iqOpts(){ try{ await api().SetIQOptions(parseInt(document.getElementById('iqCh').value), parseInt(document.getElementById('iqRate').value)) }catch(e){ toast(String(e),true) } refresh() }
 async function flexConnect(){ const v=document.getElementById('flexSel').value; if(!v){ toast('Choose a radio first',true); return } call('FlexConnect', v) }
 async function saveRun(id){
   const tds=[...document.querySelectorAll(`#ed-${id} input`)].map(i=>i.value);
