@@ -31,6 +31,7 @@ func (a *App) SavePDFReport() (string, error) {
 		radio = strings.TrimSpace(snap.Model + ` "` + snap.Nickname + `"`)
 	}
 	r := newPDFReport(st, radio)
+	r.iq = a.iqChecks(st)
 	r.build()
 	name := "FMT report.pdf"
 	if c := strings.TrimSpace(st.Session.Callsign); c != "" {
@@ -63,7 +64,9 @@ type pdfReport struct {
 	radio string
 	pdf   *fpdf.Fpdf
 	tr    func(string) string
-	w     float64 // usable width
+	w     float64                   // usable width
+	iq    map[string]*iqCheck       // IQ cross-check per run ID
+	rec   map[string]recommendation // what to submit per run ID
 }
 
 const (
@@ -99,7 +102,7 @@ func newPDFReport(st State, radio string) *pdfReport {
 // ---------------------------------------------------------------- text helpers
 
 func (r *pdfReport) h1(s string) {
-	r.need(14)
+	r.need(40) // keep a heading with what follows it
 	r.pdf.Ln(2)
 	r.pdf.SetFont("Helvetica", "B", 14)
 	r.pdf.SetTextColor(20, 60, 130)
@@ -184,11 +187,22 @@ func (r *pdfReport) table(head []string, widths []float64, align []string, rows 
 		fill := shade != nil && shade(i)
 		p.SetFillColor(226, 244, 230)
 		for j, c := range row {
-			p.CellFormat(widths[j], 4.4, r.tr(c), "1", 0, align[j], fill, 0, "")
+			p.CellFormat(widths[j], 4.4, r.fit(r.tr(c), widths[j]-1.5), "1", 0, align[j], fill, 0, "")
 		}
 		p.Ln(-1)
 	}
 	p.Ln(1.5)
+}
+
+// fit shortens s with "..." so it fits w mm in the current font.
+func (r *pdfReport) fit(s string, w float64) string {
+	if r.pdf.GetStringWidth(s) <= w {
+		return s
+	}
+	for len(s) > 1 && r.pdf.GetStringWidth(s+"...") > w {
+		s = s[:len(s)-1]
+	}
+	return s + "..."
 }
 
 // need starts a new page if h mm don't fit; it says whether it did.
@@ -400,6 +414,21 @@ func yRange(v []float64, minHalf float64) (float64, float64) {
 func (r *pdfReport) build() {
 	p := r.pdf
 	st := r.st
+	r.rec = map[string]recommendation{}
+	for _, rv := range st.Runs {
+		if rv.FinalHz == nil {
+			continue
+		}
+		sem := 0.0
+		if rv.Result != nil {
+			sem = rv.Result.SEM
+		}
+		var v *IQAnalysisView
+		if c := r.iq[rv.Run.ID]; c != nil && c.Err == "" {
+			v = c.View
+		}
+		r.rec[rv.Run.ID] = recommend(*rv.FinalHz, sem, v)
+	}
 	s := st.Session
 	p.AddPage()
 	p.SetFont("Helvetica", "B", 18)
@@ -444,6 +473,7 @@ func (r *pdfReport) build() {
 	r.table([]string{"Run", "Near kHz", "Dial Hz", "Mean fMeas Hz", "n", "Correction Hz", "Carrier Hz (nearest Hz)"},
 		[]float64{30, 16, 24, 24, 8, 22, 56}, []string{"L", "R", "R", "R", "R", "R", "R"}, res, nil)
 	r.note("Carrier = dial + slice tuning error (FlexRadio, when read) + mean fMeas - correction. Rounded to the nearest hertz in brackets. * = the run still has a warning or error in the app; see its section.")
+	r.recSummary()
 	var outs [][]string
 	for _, rv := range st.Runs {
 		if o := rv.Outcome; o != nil {
@@ -564,7 +594,22 @@ func (r *pdfReport) calSection(c CalView) {
 	var ys []float64
 	x0, x1 := math.Inf(1), math.Inf(-1)
 	min := c.Cal.MinSNR
+	if len(c.Lines) == 0 {
+		return
+	}
+	usable := map[int]bool{}
+	var left []string
+	for _, s := range cr.Stations {
+		if s.IsRef && s.N > 0 {
+			usable[s.KHz] = true
+		} else {
+			left = append(left, s.Label)
+		}
+	}
 	for _, l := range c.Lines {
+		if !usable[l.KHz] {
+			continue
+		}
 		sr := byKHz[l.KHz]
 		if sr == nil {
 			name := fmt.Sprintf("%d kHz", l.KHz)
@@ -593,7 +638,11 @@ func (r *pdfReport) calSection(c CalView) {
 	zero := 0.0
 	r.chart(chartOpts{title: "WWV Doppler: DF of each reading (Hz) over time", ylabel: "DF Hz",
 		x0: x0 - 15, x1: x1 + 15, y0: y0, y1: y1, hline: &zero, legend: true}, series)
-	r.note("Filled dots are strong readings, hollow dots weak ones (not used). With a GPS-locked radio, what remains is mostly ionospheric Doppler and noise.")
+	note := "Filled dots are strong readings, hollow dots weak ones (not used). With a GPS-locked radio, what remains is mostly ionospheric Doppler and noise."
+	if len(left) > 0 {
+		note += " Not shown (not WWV/WWVH, or no usable readings): " + strings.Join(left, ", ") + "."
+	}
+	r.note(note)
 }
 
 func (r *pdfReport) runSection(rv RunView) {
@@ -789,6 +838,7 @@ func (r *pdfReport) runSection(rv RunView) {
 	}
 	r.chart(o, []chartSeries{{name: "used (filled) / strong but left out (hollow)", rgb: palette[0], pts: pts}})
 	r.note("Shaded band: +/- 1 SD around the mean. Dashed line: drift fit. The spread and drift of the readings during the carrier are mostly Doppler on the path and measurement noise.")
+	r.iqSection(rv)
 	r.issues(rv)
 }
 

@@ -619,6 +619,15 @@ By default the app uses the **average** of before and after (see the Calibration
    drift, the dial check, the correction A + B x f and the carrier sum), the
    calibration fits, and charts of WWV Doppler during each calibration and the
    station's Doppler around each key-down.
+   With FlexRadio IQ recordings, it adds an **IQ cross-check**: each run is measured
+   from the recording that covers its key-down minute, and the summary shows the
+   WSJT-X and IQ carriers, their difference, whether they agree, and the value to
+   submit to 0.01 Hz. They agree when they differ by no more than twice their
+   combined uncertainty or 0.05 Hz, whichever is larger (each SEM counted as at least
+   0.01 Hz); then the recommendation is their uncertainty-weighted average. If they
+   disagree, the WSJT-X answer is recommended and flagged to check. Each run's
+   section shows the working and a chart of the WSJT-X readings and IQ segments
+   together.
 4. **Copy results** puts the four answers on the clipboard.
 5. Enter your measurements on the ARRL **[FMT Data Entry page](https://fmt.arrl.org/fmtentry.php)**
    before the deadline (0200Z November 16 for the November 2026 test). The ARRL
