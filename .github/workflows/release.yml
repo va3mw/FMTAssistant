@@ -7,7 +7,9 @@
 #   - or push a branch named release/<tag>, e.g. release/v0.3.4-test1: the
 #     branch's commit is built and released as <tag>. (Cloud Claude Code
 #     sessions can push branches but not tags or releases, so this is how
-#     they start one.) The branch can be deleted afterwards.
+#     they start one.) The workflow deletes the branch once the release is
+#     published, along with any older release/<tag> branch whose release
+#     exists.
 #
 # A tag with a hyphen (v0.3.4-test1, v0.3.3-iq-test) becomes a pre-release,
 # so it never replaces the latest release. The tag must match the version in
@@ -98,3 +100,19 @@ jobs:
             echo "SHA-256 of FMTAssistant.exe: \`$sha\`"
           } > notes.md
           gh release create "$TAG" "$exe" --target "$commit" --title "$TAG" --notes-file notes.md "${pre[@]}"
+
+      - name: Delete release/<tag> branches that have been released
+        # Runs even if this release failed, to tidy older ones; a branch is
+        # only deleted once a release with its tag exists, so a failed
+        # release keeps its branch.
+        if: always()
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/heads/release" --jq '.[].ref | select(startswith("refs/heads/release/"))' | while read -r ref; do
+            tag="${ref#refs/heads/release/}"
+            if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" >/dev/null 2>&1; then
+              echo "deleting ${ref#refs/heads/} (released as $tag)"
+              gh api -X DELETE "repos/$GITHUB_REPOSITORY/git/${ref}" || echo "::warning::could not delete ${ref#refs/heads/}"
+            else
+              echo "keeping ${ref#refs/heads/}: no release $tag yet"
+            fi
+          done
