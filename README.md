@@ -602,6 +602,11 @@ By default the app uses the **average** of before and after (see the Calibration
    [review its readings](#run-analysis-tab).
 3. Press **Save report & show**. This writes `FMT results.txt` in the session folder,
    with the answers, both calibrations, every run's details and any warnings. Keep it.
+   **Save PDF report** writes `FMT report <callsign>.pdf` and opens it: a report to
+   share, with every reading used, the full working for each answer (mean, SD, SEM,
+   drift, the dial check, the correction A + B x f and the carrier sum), the
+   calibration fits, and charts of WWV Doppler during each calibration and the
+   station's Doppler around each key-down.
 4. **Copy results** puts the four answers on the clipboard.
 5. Enter your measurements on the ARRL **[FMT Data Entry page](https://fmt.arrl.org/fmtentry.php)**
    before the deadline (0200Z November 16 for the November 2026 test). The ARRL
@@ -874,6 +879,7 @@ messages are warnings worth a look. **Blue** messages are information.
 | `session.json` | Your schedule, dial entries, choices and settings |
 | `IQ\<step> <UTC time> <dial> kHz.wav` and `.json` | FlexRadio IQ recordings and their description, if IQ recording is on |
 | `FMT results.txt` | The report, written when you press Save report |
+| `FMT report <callsign>.pdf` | The PDF report with all the working and charts, written when you press Save PDF report |
 | `FMT AI prompt.txt` | The AI prompt, written when you press Copy AI prompt or Show prompt |
 | `*-replaced-*.all`, `*-removed-*.all` | Earlier files kept when you replace or remove one |
 | `Archive\<UTC time>_<file>.all` | A dated copy of every file captured or loaded, for example `Archive\20261113-023612Z_2_run1_W8RKO40m.all`. These are never overwritten or renamed, so the original readings of each step are always kept. |

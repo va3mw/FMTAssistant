@@ -4,6 +4,7 @@ go 1.26.2
 
 require (
 	github.com/go-ole/go-ole v1.3.0
+	github.com/go-pdf/fpdf v0.9.0
 	github.com/wailsapp/wails/v2 v2.16.0
 	golang.org/x/sys v0.49.0
 )
