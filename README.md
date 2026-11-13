@@ -86,6 +86,7 @@ for the minute-by-minute version. The rest of this README explains each step.
 13. [Troubleshooting](#troubleshooting)
 14. [How the numbers are calculated](#how-the-numbers-are-calculated)
 15. [How accurate is it?](#how-accurate-is-it)
+    - [WSJT-X may measure only half of the key-down minute](#wsjt-x-may-measure-only-half-of-the-key-down-minute)
 16. [Building from source](#building-from-source)
 17. [Credits](#credits)
 
@@ -401,6 +402,9 @@ drift), the same carrier with the calibration correction the app uses, the app's
 WSJT-X answer and the difference, a chart of every segment and the average spectrum.
 For a WWV recording it shows how far the radio reads WWV off nominal, in Hz and ppm.
 If the carrier is clearer with I and Q swapped, that is detected and reported.
+
+The IQ covers the whole key-down minute even when WSJT-X only measured part of it
+(see [WSJT-X may measure only half of the key-down minute](#wsjt-x-may-measure-only-half-of-the-key-down-minute)).
 
 ## Step 2: Practice (Practice tab)
 
@@ -1055,6 +1059,50 @@ scatter was about 6 ppb from second to second, averaging down to about 0.5 ppb o
 - **A Doppler gauge, if you have a second receiver:** watch WWV 10 MHz on it during the
   test. Its apparent wobble shows how disturbed the ionosphere is. It's a different
   path, so it can't correct anything, but it tells you how far to trust each minute.
+
+### WSJT-X may measure only half of the key-down minute
+
+On the November 2026 test (VA3MW, WSJT-X v3.3.0-beta5 in FreqCal with T/R 30 s),
+every run's `fmt.all` had readings only from about **:04 to :29** of each minute,
+and nothing from :30 to :03. So of each one-minute carrier, only about **25 seconds
+(about 12 readings)** were measured:
+
+| Run | Readings in the key-down minute | Used (edges trimmed) | SD | SEM |
+|---|---|---|---|---|
+| K5CM 40 m | 02:49:04-02:49:29 | 10 | 0.04 Hz | 0.014 Hz |
+| W8RKO 80 m | 03:04:04-03:04:29 | 10 | 0.04 Hz | 0.013 Hz |
+| K5CM 80 m | 03:19:04-03:19:29 | 10 | 0.14 Hz | 0.043 Hz |
+
+That costs accuracy in two ways:
+
+- **Fewer readings.** Measuring 25 s instead of the whole minute makes the average's
+  noise (SEM) about √(60/25) ≈ 1.5 times larger. On a noisy run such as K5CM 80 m
+  above (weaker signal, S/N 30-57, readings swinging ±0.2 Hz), that matters.
+- **Only the first half of the carrier.** If the path Doppler drifts during the
+  minute, the answer is the frequency during the first half, not the average over
+  the whole minute, which is what you want.
+
+The cause isn't confirmed yet. It looks tied to WSJT-X's T/R period in FreqCal mode.
+Before the next test, check on the **Practice** tab with a steady carrier (an AM
+broadcast station or WWV) whether readings arrive for the whole minute, and try other
+T/R settings if they don't. The live preview and Run analysis show the times of every
+reading.
+
+**This is where IQ recording helps.** With a FlexRadio and [IQ recording](#iq-recording-optional-for-analysis-later)
+on, the radio's IQ is recorded continuously for the whole step, gaps or not. The
+**IQ analysis** tab then measures the carrier over the whole key-down minute (from
+5 s after key-down to 5 s before key-up), in 4-second segments refined with a fit
+to the signal's phase. That gives:
+
+- a measurement of the **second half of the minute** that WSJT-X missed, and of the
+  whole minute's average, to compare with the WSJT-X answer;
+- the carrier's **drift and Doppler through the full minute**, segment by segment, so
+  you can see whether the half WSJT-X measured was typical;
+- a check with much lower measurement noise than FreqCal's, so the remaining spread is
+  mostly the path itself.
+
+The answer you submit still comes from WSJT-X; use the IQ result to judge it (see
+[Reading a recording back](#iq-recording-optional-for-analysis-later)).
 
 **What doesn't help:** more decimal places, averaging beyond the one-minute key-down,
 or a WWV correction on a GPS-locked radio.
