@@ -250,7 +250,15 @@ function put(id, html){
   const el=document.getElementById(id);
   if(el.contains(document.activeElement) && document.activeElement.matches('input,select')) return;
   if(lastJSON[id]===html) return;
+  // Rebuilding the HTML would put scrolled boxes back at the top and close
+  // open <details>; keep both, and the page's own scroll position.
+  const main=document.querySelector('main'), top=main? main.scrollTop : 0;
+  const scrolls=[...el.querySelectorAll('.scroll')].map(s=>[s.scrollTop, s.scrollLeft]);
+  const opened=[...el.querySelectorAll('details')].map(d=>d.open);
   lastJSON[id]=html; el.innerHTML=html;
+  el.querySelectorAll('.scroll').forEach((s,i)=>{ if(scrolls[i]){ s.scrollTop=scrolls[i][0]; s.scrollLeft=scrolls[i][1] } });
+  el.querySelectorAll('details').forEach((d,i)=>{ if(i<opened.length) d.open=opened[i] });
+  if(main) main.scrollTop=top;
 }
 
 // ------------------------------------------------------------------ audio
