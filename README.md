@@ -628,7 +628,9 @@ By default the app uses the **average** of before and after (see the Calibration
    disagree, the WSJT-X answer is recommended and flagged to check. Each run's
    section shows the working and a chart of the WSJT-X readings and IQ segments
    together.
-4. **Copy results** puts the four answers on the clipboard.
+4. **Copy results** puts the four answers on the clipboard. To copy one answer, click its
+   Carrier frequency: the number (two decimals, no commas) goes on the clipboard and a
+   notice confirms it, ready to paste into the ARRL FMT entry page.
 5. Enter your measurements on the ARRL **[FMT Data Entry page](https://fmt.arrl.org/fmtentry.php)**
    before the deadline (0200Z November 16 for the November 2026 test). The ARRL
    asks you to describe your setup; mention your radio, its reference, and that you
@@ -846,6 +848,12 @@ The version, author and license, and links to the
 [FMT data entry page](https://fmt.arrl.org/fmtentry.php), the fmt-nuts group,
 these instructions, the latest release, and the issue tracker. Links open in your
 web browser. The Results tab also has an **ARRL FMT data entry page** button.
+
+**Check for updates** asks GitHub for the latest release and tells you whether you
+have it. If a newer version is out, it shows the release notes with links to
+download the new `FMTAssistant.exe` and to the release page. It never installs
+anything: close FMT Assistant, replace the old `.exe` with the new one, and start it
+again. Your sessions are kept.
 
 ## Checks and warnings, and what to do about them
 
