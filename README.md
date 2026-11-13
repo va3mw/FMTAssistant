@@ -403,6 +403,14 @@ WSJT-X answer and the difference, a chart of every segment and the average spect
 For a WWV recording it shows how far the radio reads WWV off nominal, in Hz and ppm.
 If the carrier is clearer with I and Q swapped, that is detected and reported.
 
+**A recording that spans several runs** (for example one made while a step was
+watched by hand, which kept one recording going all night) shows a button for each
+run whose key-down falls inside it. That reads only the run's key-down minute from
+the file, looks within ±20 Hz of the carrier WSJT-X found (dial + mean fMeas), and
+compares as above. It also shows the IQ carrier over just the seconds WSJT-X
+measured, next to the whole minute's, so you can see what the rest of the minute
+would have changed.
+
 The IQ covers the whole key-down minute even when WSJT-X only measured part of it
 (see [WSJT-X may measure only half of the key-down minute](#wsjt-x-may-measure-only-half-of-the-key-down-minute)).
 

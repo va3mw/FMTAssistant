@@ -753,9 +753,11 @@ function onLive(ev){
 // liveWanted is the step to follow now: the one on the schedule, or the one
 // the operator chose with Watch live.
 function liveWanted(now){
-  if(liveManual) return liveManual;
+  // A scheduled run always takes over from a step watched by hand, so each
+  // run gets its own live preview (and its own IQ recording).
   const p=phase(now);
-  if(p) return p.rv.run.id;
+  if(p){ if(liveManual && liveManual!==p.rv.run.id) liveManual=''; return p.rv.run.id }
+  if(liveManual) return liveManual;
   const ev=events(), at=id=>(ev.find(e=>e.id===id)||{}).t;
   const cs=at('calb-start'), ce=at('calb-stop'), ca=at('cala-start');
   if(cs && now>=cs && now<ce+4*60e3 && !S.cals[0].present) return 'cal_before';
@@ -1264,13 +1266,22 @@ function iqOptsNow(){
   return {expect_hz: khz>0? khz*1000:0, search_hz: parseFloat(g('iqSearch'))||0, min_snr: parseFloat(g('iqMin'))||0,
     seg_sec: parseFloat(g('iqSeg'))||0, mirror: parseInt(g('iqMirror')||'0')};
 }
-async function iqAnalyze(path){
-  const o=iqOptsNow();
-  IQ.busy=path; IQ.err=''; renderIQ();
+async function iqAnalyze(path, runId){
+  const o=iqOptsNow(); o.run_id=runId||'';
+  // A run measured from a long recording looks where WSJT-X found it, unless
+  // a frequency is typed; the ±150 Hz default is for whole files.
+  if(runId && !document.getElementById('iqSearch').dataset.touched) o.search_hz=0;
+  IQ.busy=path+'|'+(runId||''); IQ.err=''; renderIQ();
   try{ IQ.res=await api().AnalyzeIQ(path, o) }catch(e){ IQ.err=String(e); toast(String(e),true) }
   IQ.busy=''; renderIQ();
 }
-function iqAnalyzeIdx(i){ if(IQ.files&&IQ.files[i]) iqAnalyze(IQ.files[i].path) }
+function iqAnalyzeIdx(i, runId){ if(IQ.files&&IQ.files[i]) iqAnalyze(IQ.files[i].path, runId) }
+// iqRunsIn lists the runs whose key-down minute lies inside a recording.
+function iqRunsIn(f){
+  const m=f.meta; if(!m||!m.start_utc||m.start_utc.startsWith('0001')||!m.sample_rate) return [];
+  const t0=new Date(m.start_utc).getTime(), t1=t0+m.frames/m.sample_rate*1000;
+  return [...S.runs, ...(S.practice&&started(S.practice.run)?[S.practice]:[])].filter(rv=>{ const kd=new Date(rv.run.key_down).getTime(); return kd>=t0-5e3 && kd+60e3<=t1+5e3 });
+}
 async function iqBrowse(){ try{ const p=await api().BrowseIQFile(); if(p) iqAnalyze(p) }catch(e){ toast(String(e),true) } }
 function iqName(f){ const m=f.meta; return m? (m.title||m.step)+(m.slice?' · slice '+m.slice:'') : f.name }
 function iqDur(m){ return m&&m.sample_rate? m.frames/m.sample_rate : null }
@@ -1282,7 +1293,7 @@ function renderIQ(){
     <div class="hint">Measures the carrier straight from a FlexRadio IQ recording, independently of WSJT-X, as a cross-check. It never changes the answer you submit.</div>
     <div class="row" style="margin-top:8px;flex-wrap:wrap">
       <span class="hint">Look near</span><input id="iqExpect" class="num" style="width:110px" placeholder="dial + 1.5" value="${opt.expect_hz? opt.expect_hz/1000:''}"><span class="hint">kHz ±</span>
-      <input id="iqSearch" class="num" style="width:60px" value="${opt.search_hz||150}"><span class="hint">Hz · segments</span>
+      <input id="iqSearch" class="num" style="width:60px" value="${opt.search_hz||150}" oninput="this.dataset.touched=1"><span class="hint">Hz · segments</span>
       <input id="iqSeg" class="num" style="width:50px" value="${opt.seg_sec||4}"><span class="hint">s · min SNR</span>
       <input id="iqMin" class="num" style="width:50px" value="${opt.min_snr||15}"><span class="hint">dB · I/Q</span>
       <select id="iqMirror"><option value="0" ${opt.mirror===0?'selected':''}>detect</option><option value="1" ${opt.mirror===1?'selected':''}>as recorded</option><option value="-1" ${opt.mirror===-1?'selected':''}>swapped</option></select></div>`;
@@ -1293,7 +1304,9 @@ function renderIQ(){
     ${files.map((f,i)=>{ const m=f.meta, d=iqDur(m); return `<tr${IQ.res&&IQ.res.path===f.path?' class="sel"':''}><td>${esc(iqName(f))}<div class="hint mono">${esc(f.name)}</div></td>
       <td class="mono">${m&&m.start_utc&&!m.start_utc.startsWith('0001')? hhmmss(m.start_utc):'-'}</td><td>${f.recording?'<span class="status warn">recording</span>': d!=null? d.toFixed(0)+' s':'-'}</td>
       <td>${m&&m.sample_rate? m.sample_rate/1000+' kHz':'-'}</td><td class="mono">${m? fmtKHz(m.center_hz):'-'}</td><td>${iqMB(f.bytes)}${m&&m.lost_packets?'<div class="hint">'+m.lost_packets+' packets lost</div>':''}</td>
-      <td><button class="small${IQ.busy===f.path?'':' primary'}" ${IQ.busy?'disabled':''} onclick="iqAnalyzeIdx(${i})">${IQ.busy===f.path?'Measuring…':'Measure'}</button></td></tr>` }).join('')}</table>`;
+      <td style="white-space:normal"><button class="small${IQ.busy===f.path+'|'?'':' primary'}" ${IQ.busy?'disabled':''} onclick="iqAnalyzeIdx(${i})" title="Measure the whole recording">${IQ.busy===f.path+'|'?'Measuring…':'Measure'}</button>
+        ${iqRunsIn(f).filter(rv=>!m||rv.run.id!==m.step).map(rv=>`<button class="small" ${IQ.busy?'disabled':''} onclick="iqAnalyzeIdx(${i},'${rv.run.id}')" title="Measure only the ${esc(rv.title)} key-down minute from this recording">${IQ.busy===f.path+'|'+rv.run.id?'Measuring…':esc(rv.title)}</button>`).join('')}</td></tr>` }).join('')}</table>
+    <div class="hint">A recording that spans several runs (for example one made while a step was watched by hand) shows a button for each run in it: that measures only the run's key-down minute, near the carrier WSJT-X found.</div>`;
   h+='</div>';
   if(IQ.res) h+=iqResult(IQ.res);
   h+='</div>';
@@ -1309,6 +1322,7 @@ function iqResult(v){
     kv.push(['Carrier from IQ', `<b class="mono">${hz3(s.mean_rf_hz)}</b> ± ${s.sem.toFixed(4)} Hz <span class="hint">(raw, as the radio sees it; ${s.n} segments, SD ${s.sd.toFixed(4)} Hz${s.n>=3?', drift '+sgn(s.drift_hz_min,4)+' Hz/min':''})</span>`]);
     kv.push(['Basis', esc(s.basis)+` <span class="hint">${s.from&&!s.from.startsWith('0001')? hhmmss(s.from)+'–'+hhmmss(s.to)+' UTC':''}</span>`]);
     kv.push(['Audio equivalent', `<span class="mono">${s.mean_audio_hz.toFixed(4)} Hz</span> <span class="hint">above the dial${v.wsjtx_mean!=null?'; WSJT-X mean fMeas '+v.wsjtx_mean.toFixed(3)+' Hz ('+sgn(s.mean_audio_hz-v.wsjtx_mean,3)+')':''}</span>`]);
+    if(v.same_span_hz!=null) kv.push(['Same seconds as WSJT-X', `<span class="mono">${hz3(v.same_span_hz)}</span> <span class="hint">IQ over ${v.same_span_from}–${v.same_span_to} UTC only (${v.same_span_n} segments), the part of the minute WSJT-X measured; the whole minute is ${sgn(s.mean_rf_hz-v.same_span_hz,3)} Hz from it</span>`]);
     if(v.corr_hz!=null) kv.push(['With the calibration', `<b class="mono">${hz3(v.iq_final_hz)}</b> <span class="hint">IQ carrier − ${v.corr_hz.toFixed(3)} Hz correction, as the app applies to the WSJT-X answer</span>`]);
     if(v.app_final_hz!=null) kv.push(['App answer (WSJT-X)', `<span class="mono">${hz3(v.app_final_hz)}</span> <span class="hint">IQ ${sgn(v.diff_hz,3)} Hz from it</span>`]);
     if(v.wwv_err_hz!=null) kv.push(['WWV', `${(v.wwv_hz/1e6)} MHz reads <b>${sgn(v.wwv_err_hz,4)} Hz</b> (${sgn(v.wwv_ppm,4)} ppm) <span class="hint">the radio's own error at this frequency, uncorrected</span>`]);

@@ -33,6 +33,9 @@ type Options struct {
 	MinSNR   float64   // dB, segments below are left out (default 15)
 	Mirror   int       // 0 detect, 1 as recorded, -1 mirrored (I and Q swapped)
 	From, To time.Time // average only segments inside this window, if any are
+	// Only reads the window (plus a margin), e.g. one run's key-down from a
+	// recording that spans the whole night. Needs From, To and a start time.
+	OnlyWindow bool
 }
 
 // Segment is one measurement.
@@ -133,15 +136,47 @@ func Analyze(path string, meta *Meta, opt Options) (*Analysis, error) {
 		opt.MinSNR = 15
 	}
 	a.ExpectHz, a.SearchHz, a.SegSec, a.MinSNR = opt.ExpectHz, opt.SearchHz, opt.SegSec, opt.MinSNR
+
+	tl := newTimeline(meta, a.CenterHz, a.DialHz)
+	var frame, end int64 = 0, w.Frames
+	if opt.OnlyWindow {
+		if a.Start.IsZero() || opt.From.IsZero() || opt.To.IsZero() {
+			return nil, fmt.Errorf("the recording's start time is unknown, so a time window can't be found in it")
+		}
+		const margin = 10 * time.Second
+		from := int64(opt.From.Add(-margin).Sub(a.Start).Seconds() * float64(w.Rate))
+		end = int64(opt.To.Add(margin).Sub(a.Start).Seconds() * float64(w.Rate))
+		if from < 0 {
+			from = 0
+		}
+		if end > w.Frames {
+			end = w.Frames
+		}
+		if from >= end {
+			return nil, fmt.Errorf("the recording (%s to %s UTC) doesn't cover %s to %s UTC",
+				a.Start.Format("15:04:05"), a.Start.Add(time.Duration(a.Seconds*float64(time.Second))).Format("15:04:05"),
+				opt.From.Format("15:04:05"), opt.To.Format("15:04:05"))
+		}
+		if err := w.Skip(from); err != nil {
+			return nil, err
+		}
+		frame = from
+		a.CenterHz, _ = tl.at(from) // the centre in effect there
+		a.DialHz = tl.dialAt(from)
+		if lost := lostBefore(meta, from); lost > 0 {
+			a.Notes = append(a.Notes, fmt.Sprintf("About %d samples (%.2f s) were lost earlier in the recording, so times here may be early by up to that much.",
+				lost, float64(lost)/float64(w.Rate)))
+		}
+	}
 	if off := opt.ExpectHz - float64(a.CenterHz); math.Abs(off)+opt.SearchHz > float64(w.Rate)/2 {
 		a.Notes = append(a.Notes, fmt.Sprintf("%.0f Hz is outside the recorded band (centre %d Hz, ±%d Hz).", opt.ExpectHz, a.CenterHz, w.Rate/2))
 	}
-
-	tl := newTimeline(meta, a.CenterHz, a.DialHz)
 	chains := []*chain{newChain(a, opt, w.Rate, false), newChain(a, opt, w.Rate, true)}
 	buf := make([]complex64, 1<<16)
-	var frame int64
-	for {
+	for frame < end {
+		if rest := end - frame; rest < int64(len(buf)) {
+			buf = buf[:rest]
+		}
 		n, err := w.Read(buf)
 		if n > 0 {
 			for i := 0; i < n; i++ {
@@ -193,6 +228,21 @@ func Analyze(path string, meta *Meta, opt Options) (*Analysis, error) {
 		a.Notes = append(a.Notes, "No segment has a clear carrier near the expected frequency.")
 	}
 	return a, nil
+}
+
+// lostBefore estimates the samples lost before a frame (from the packet gaps).
+func lostBefore(m *Meta, frame int64) int64 {
+	if m == nil || m.Packets == 0 || m.Frames == 0 {
+		return 0
+	}
+	perPkt := m.Frames / m.Packets
+	var n int64
+	for _, g := range m.Gaps {
+		if g.Frame <= frame {
+			n += int64(g.Packets) * perPkt
+		}
+	}
+	return n
 }
 
 // timeline gives the panadapter centre and the dial at a frame.

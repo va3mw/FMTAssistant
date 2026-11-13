@@ -158,6 +158,34 @@ func (w *WAVReader) Read(dst []complex64) (int, error) {
 	return n, nil
 }
 
+// Skip moves past n frames without reading them.
+func (w *WAVReader) Skip(n int64) error {
+	if n > w.left {
+		n = w.left
+	}
+	if n <= 0 {
+		return nil
+	}
+	fb := int64(4)
+	if w.Float {
+		fb = 8
+	}
+	bytes := n * fb
+	// Use up what the buffer already holds, then seek past the rest.
+	b := min(bytes, int64(w.r.Buffered()))
+	if _, err := w.r.Discard(int(b)); err != nil {
+		return err
+	}
+	if rest := bytes - b; rest > 0 {
+		if _, err := w.f.Seek(rest, io.SeekCurrent); err != nil {
+			return err
+		}
+		w.r.Reset(w.f)
+	}
+	w.left -= n
+	return nil
+}
+
 func (w *WAVReader) Close() error { return w.f.Close() }
 
 // LoadMeta reads the JSON written beside a recording. ok is false when there

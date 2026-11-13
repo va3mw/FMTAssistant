@@ -114,3 +114,27 @@ func TestReadWAVRoundTrip(t *testing.T) {
 		t.Fatalf("%+v", w)
 	}
 }
+
+// A run measured from inside a longer recording: only its window is read,
+// and the centre in effect there is used.
+func TestAnalyzeOnlyWindow(t *testing.T) {
+	const rf = 7064000.137
+	path, meta := synth(t, rf, false, 700) // re-centred 32.3 s in
+	from := meta.StartUTC.Add(34 * time.Second)
+	a, err := Analyze(path, meta, Options{ExpectHz: rf, SearchHz: 20, From: from, To: from.Add(5 * time.Second), OnlyWindow: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.CenterHz != 7062500+700 {
+		t.Fatalf("centre %d", a.CenterHz)
+	}
+	if len(a.Segments) > 4 || a.Summary == nil || math.Abs(a.Summary.MeanRFHz-rf) > 0.002 {
+		t.Fatalf("segs %d summary %+v", len(a.Segments), a.Summary)
+	}
+	if a.Segments[0].Sec < 20 {
+		t.Fatalf("read from the start: first segment at %.1f s", a.Segments[0].Sec)
+	}
+	if _, err := Analyze(path, meta, Options{ExpectHz: rf, From: from.Add(time.Hour), To: from.Add(time.Hour + time.Minute), OnlyWindow: true}); err == nil {
+		t.Fatal("window outside the recording accepted")
+	}
+}
