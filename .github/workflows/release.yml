@@ -1,0 +1,91 @@
+# Builds FMTAssistant.exe on Windows and publishes it as a GitHub release.
+#
+# Start it either way:
+#   - push a tag:   git tag v0.3.4 && git push origin v0.3.4
+#   - or Actions > Release > Run workflow, with a tag and the branch or
+#     commit to build (the tag is created on that commit).
+#
+# A tag with a hyphen (v0.3.4-test1, v0.3.3-iq-test) becomes a pre-release,
+# so it never replaces the latest release. The tag must match the version in
+# main.go and wails.json: v0.3.4 for 0.3.4, or v0.3.4-anything as a test of it.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to create and release, e.g. v0.3.4 or v0.3.4-test1"
+        required: true
+      ref:
+        description: "Branch or commit to build"
+        required: true
+        default: main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Check the tag matches the app version
+        run: |
+          app=$(sed -n 's/^const version = "\(.*\)"/\1/p' main.go)
+          wails=$(sed -n 's/.*"productVersion": "\(.*\)".*/\1/p' wails.json)
+          echo "tag $TAG, main.go $app, wails.json $wails"
+          if [ "$app" != "$wails" ]; then
+            echo "::error::main.go says $app but wails.json says $wails"; exit 1
+          fi
+          case "$TAG" in
+            "v$app"|"v$app"-*) ;;
+            *) echo "::error::tag $TAG does not match version $app (use v$app, or v$app-something for a test build)"; exit 1 ;;
+          esac
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::release $TAG already exists"; exit 1
+          fi
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        run: wails build -ldflags "-s -w"
+
+      - name: Publish the release
+        run: |
+          exe=build/bin/FMTAssistant.exe
+          sha=$(sha256sum "$exe" | cut -d' ' -f1)
+          commit=$(git rev-parse HEAD)
+          pre=()
+          kind="Release"
+          case "$TAG" in *-*) pre=(--prerelease); kind="Test build (pre-release)";; esac
+          {
+            echo "$kind built by GitHub Actions from \`${commit:0:7}\` (${{ inputs.ref || github.ref_name }})."
+            echo
+            echo "Download \`FMTAssistant.exe\` and run it. No installer."
+            echo
+            echo "SHA-256 of FMTAssistant.exe: \`$sha\`"
+          } > notes.md
+          gh release create "$TAG" "$exe" --target "$commit" --title "$TAG" --notes-file notes.md "${pre[@]}"
