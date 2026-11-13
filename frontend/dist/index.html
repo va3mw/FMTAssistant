@@ -103,7 +103,9 @@ select{max-width:100%}
 .bigdial{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent)}
 .answer{font-family:var(--mono);font-size:20px;font-weight:700}
 .answer.ok{color:var(--ok)}
-.paste{user-select:all;-webkit-user-select:all;cursor:text}
+.paste{user-select:all;-webkit-user-select:all;cursor:copy;border-radius:4px;padding:0 2px}
+.paste:hover{background:var(--hl)}
+.paste.copied{background:var(--ok-bg);outline:1px solid var(--ok)}
 .status{font-size:12px;font-weight:600;border-radius:5px;padding:2px 7px}
 .status.ok{background:var(--ok-bg);color:var(--ok)}
 .status.wait{background:var(--chip);color:var(--muted)}
@@ -228,8 +230,15 @@ function safeSet(k,v){ try{ localStorage.setItem(k,v) }catch(e){} }
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
 function commas(n){ return Math.trunc(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') }
 function fmtKHz(hz){ if(!hz) return '-'; const k=Math.round(hz)/1000; const w=Math.floor(k); return commas(w)+'.'+String(Math.round((k-w)*1000)).padStart(3,'0')+' kHz' }
-// fmtAns shows an answer as plain Hz (no commas, 2 decimals) for pasting into the ARRL FMT entry page; one click selects just the number.
-function fmtAns(hz){ if(hz==null) return '-'; return '<span class="paste" title="Click to select, then copy">'+hz.toFixed(2)+'</span> Hz' }
+// fmtAns shows an answer as plain Hz (no commas, 2 decimals) for pasting into the ARRL FMT entry page; one click copies just the number.
+function fmtAns(hz){ if(hz==null) return '-'; const v=hz.toFixed(2); return `<span class="paste" title="Click to copy" onclick="copyAns(this,'${v}')">${v}</span> Hz` }
+async function copyAns(el, v){
+  let ok=false;
+  try{ ok=await window.runtime.ClipboardSetText(v) }catch(e){}
+  if(!ok){ try{ await navigator.clipboard.writeText(v); ok=true }catch(e){} }
+  if(ok){ toast('Copied '+v+' to the clipboard. Paste it into the ARRL FMT entry page.'); el.classList.add('copied'); setTimeout(()=>el.classList.remove('copied'),1200) }
+  else toast('Could not copy to the clipboard. Select the number and press Ctrl+C.', true);
+}
 function fmtHz(hz){ if(hz==null) return '-'; let w=Math.floor(hz), c=Math.round((hz-w)*100); if(c===100){w++;c=0} return commas(w)+'.'+String(c).padStart(2,'0')+' Hz' }
 function hhmm(t){ const d=new Date(t); return d.toISOString().substr(11,5) }
 function hhmmss(t){ return new Date(t).toISOString().substr(11,8) }
@@ -991,7 +1000,7 @@ function renderResults(){
   let h=`<div class="card"><h2>Measurements to submit</h2><div class="hint">For each run, enter the <b>Carrier frequency</b> on the ARRL FMT data entry page; that is your answer.
     It is the WSJT-X answer (Carrier = Dial + Mean fMeas − Correction) or, when a FlexRadio IQ recording covers the run's key-down minute and agrees with it,
     the uncertainty-weighted average of the two, exactly as the PDF report recommends. <b>Basis</b> says which; hover it for the reason.
-    Only runs marked <b>Ready</b> have passed every check; fix any others (Run analysis tab) before you submit them.</div>
+    Click a Carrier frequency to copy it. Only runs marked <b>Ready</b> have passed every check; fix any others (Run analysis tab) before you submit them.</div>
     <table style="margin-top:10px"><tr><th>Run</th><th>Key-down</th><th class="n">Dial</th><th class="n">Mean fMeas</th><th class="n">Correction</th><th class="n">WSJT-X Hz</th><th class="n">IQ Hz</th><th class="n">IQ − WSJT-X</th><th class="n">Carrier frequency</th><th>Basis</th><th>Status</th></tr>
     ${S.runs.map(rv=>`<tr><td>${esc(rv.title)}</td><td>${hhmm(rv.run.key_down)}Z</td><td class="n">${rv.run.dial_hz?fmtHz(rv.run.dial_hz):'-'}</td>
       <td class="n">${rv.result&&rv.result.n?rv.result.mean_fmeas.toFixed(3):'-'}</td><td class="n">${rv.corr_hz!=null?rv.corr_hz.toFixed(3):'-'}</td>
