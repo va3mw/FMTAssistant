@@ -4,15 +4,15 @@ import (
 	"bufio"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"math"
 	"os"
 	"time"
 )
 
 // WAVWriter writes stereo 32-bit float samples (left I, right Q) to a WAV
-// file. The header is written with placeholder sizes and completed by Close,
-// when the sample rate, centre frequency and stop time are final.
+// file. The header starts with the expected rate and centre, is brought up
+// to date by Sync while recording (so a crash leaves a readable file), and
+// is completed by Close.
 //
 // The file carries an "auxi" chunk in the layout HDSDR and SDR# use, so those
 // programs show the centre frequency and start time.
@@ -30,14 +30,15 @@ const (
 	maxData    = math.MaxUint32 - headerSize
 )
 
-// CreateWAV creates path and writes a provisional header.
-func CreateWAV(path string, start time.Time) (*WAVWriter, error) {
+// CreateWAV creates path and writes a header with the expected rate and
+// centre frequency and no samples yet.
+func CreateWAV(path string, start time.Time, rate int, centerHz int64) (*WAVWriter, error) {
 	f, err := os.Create(path)
 	if err != nil {
 		return nil, err
 	}
 	w := &WAVWriter{f: f, w: bufio.NewWriterSize(f, 1<<20), started: start}
-	if _, err := w.w.Write(header(0, 0, 0, start, start)); err != nil {
+	if _, err := w.w.Write(header(0, rate, centerHz, start, start)); err != nil {
 		f.Close()
 		return nil, err
 	}
@@ -71,14 +72,19 @@ func (w *WAVWriter) Write(iq []float32) error {
 	return nil
 }
 
+// Sync writes out the samples so far and brings the header up to date, so
+// the file is readable as it stands.
+func (w *WAVWriter) Sync(rate int, centerHz int64, stop time.Time) error {
+	if err := w.w.Flush(); err != nil {
+		return err
+	}
+	_, err := w.f.WriteAt(header(w.frames, rate, centerHz, w.started, stop), 0)
+	return err
+}
+
 // Close completes the header with the final rate and centre frequency.
 func (w *WAVWriter) Close(rate int, centerHz int64, stop time.Time) error {
-	err := w.w.Flush()
-	if _, e := w.f.Seek(0, io.SeekStart); e == nil && err == nil {
-		_, err = w.f.Write(header(w.frames, rate, centerHz, w.started, stop))
-	} else if err == nil {
-		err = e
-	}
+	err := w.Sync(rate, centerHz, stop)
 	if e := w.f.Close(); err == nil {
 		err = e
 	}

@@ -142,3 +142,42 @@ func TestSnapRate(t *testing.T) {
 		}
 	}
 }
+
+// A recording that is never closed (the app stopped) is still readable up to
+// its last checkpoint, with its description marked in progress.
+func TestRecorderCrashSafe(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "crash.wav")
+	r, err := NewRecorder(path, Meta{Step: "run1", CenterHz: 7062500, DialHz: 7062500, RequestedRate: 24000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	samples := make([]float32, 2*240) // 240 frames per packet: 100 packets a second
+	for i := range samples {
+		samples[i] = float32(math.Sin(float64(i)))
+	}
+	t0 := time.Date(2026, 11, 13, 2, 34, 0, 0, time.UTC)
+	for i := 0; i < 4000; i++ { // 40 s
+		p, _ := ParseVITA(vita(uint8(i), 7, samples, binary.BigEndian))
+		r.Packet(p, t0.Add(time.Duration(i)*10*time.Millisecond))
+	}
+	// no Close: as if the app had stopped
+	w, err := OpenWAV(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	if w.Rate != 24000 || w.CenterHz != 7062500 || w.Frames < 24000*29 {
+		t.Fatalf("after a crash: rate %d centre %d frames %d", w.Rate, w.CenterHz, w.Frames)
+	}
+	m, ok, err := LoadMeta(path)
+	if err != nil || !ok || !m.InProgress || m.Frames != w.Frames || m.StartUTC != t0 {
+		t.Fatalf("description %+v ok %v err %v", m, ok, err)
+	}
+	if _, err := os.Stat(r.MetaPath() + ".tmp"); !os.IsNotExist(err) {
+		t.Fatal("temporary description left behind")
+	}
+	// Closing afterwards clears the flag.
+	if m, _ := r.Close(); m.InProgress {
+		t.Fatal("still in progress after Close")
+	}
+}

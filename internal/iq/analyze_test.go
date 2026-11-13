@@ -17,7 +17,7 @@ func synth(t *testing.T, rfHz float64, mirror bool, recentre int64) (string, *Me
 	center := int64(7062500)
 	path := filepath.Join(t.TempDir(), "x.wav")
 	start := time.Date(2026, 11, 13, 2, 33, 40, 0, time.UTC)
-	w, err := CreateWAV(path, start)
+	w, err := CreateWAV(path, start, rate, center)
 	if err != nil {
 		t.Fatal(err)
 	}
