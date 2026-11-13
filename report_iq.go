@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -74,6 +76,98 @@ func recommend(wHz, wSEM float64, iq *IQAnalysisView) recommendation {
 	return rc
 }
 
+// RecView is the value to submit for one run, the same one the PDF report
+// recommends, with the IQ cross-check behind it.
+type RecView struct {
+	RunID   string  `json:"run_id"`
+	Hz      float64 `json:"hz"`   // to submit, rounded to 0.01 Hz
+	WHz     float64 `json:"w_hz"` // WSJT-X carrier
+	HasIQ   bool    `json:"has_iq"`
+	IQHz    float64 `json:"iq_hz"` // IQ carrier with the same correction
+	Delta   float64 `json:"delta"` // IQ - WSJT-X
+	Limit   float64 `json:"limit"`
+	Agree   bool    `json:"agree"`
+	Short   string  `json:"short"`
+	Basis   string  `json:"basis"`
+	Warning string  `json:"warning"`
+}
+
+// round2 rounds to the 0.01 Hz the ARRL entry page takes.
+func round2(hz float64) float64 { return math.Round(hz*100) / 100 }
+
+// recCache keeps the last IQ cross-check, since measuring the recordings
+// takes a while and the Results page asks often.
+type recCache struct {
+	mu  sync.Mutex
+	key string
+	iq  map[string]*iqCheck
+	rec map[string]recommendation
+}
+
+var recs recCache
+
+// recommendations measures the IQ recordings and works out what to submit
+// for every run. The PDF report, the text report and the Results page all
+// use it, so they always agree. The result is cached until a run's answer
+// or the IQ recordings change.
+func (a *App) recommendations(st State) (map[string]*iqCheck, map[string]recommendation) {
+	files, _ := a.ListIQFiles()
+	var kb strings.Builder
+	for _, rv := range st.Runs {
+		if rv.FinalHz != nil {
+			fmt.Fprintf(&kb, "%s %.6f %.6f %v|", rv.Run.ID, *rv.FinalHz, runSEM(rv), rv.CorrHz != nil)
+		}
+	}
+	for _, f := range files {
+		fmt.Fprintf(&kb, "%s %d %d %v|", f.Path, f.Bytes, f.Modified.UnixNano(), f.Recording)
+	}
+	key := kb.String()
+	recs.mu.Lock()
+	defer recs.mu.Unlock()
+	if recs.rec != nil && recs.key == key {
+		return recs.iq, recs.rec
+	}
+	iqs := a.iqChecks(st)
+	rec := map[string]recommendation{}
+	for _, rv := range st.Runs {
+		if rv.FinalHz == nil {
+			continue
+		}
+		var v *IQAnalysisView
+		if c := iqs[rv.Run.ID]; c != nil && c.Err == "" {
+			v = c.View
+		}
+		rec[rv.Run.ID] = recommend(*rv.FinalHz, runSEM(rv), v)
+	}
+	recs.key, recs.iq, recs.rec = key, iqs, rec
+	return iqs, rec
+}
+
+func runSEM(rv RunView) float64 {
+	if rv.Result != nil {
+		return rv.Result.SEM
+	}
+	return 0
+}
+
+// Recommendations returns the value to submit for each run that has an
+// answer, in run order, with its IQ cross-check.
+func (a *App) Recommendations() ([]RecView, error) {
+	st := a.GetState()
+	_, rec := a.recommendations(st)
+	out := []RecView{}
+	for _, rv := range st.Runs {
+		rc, ok := rec[rv.Run.ID]
+		if !ok {
+			continue
+		}
+		out = append(out, RecView{RunID: rv.Run.ID, Hz: round2(rc.Hz), WHz: rc.WHz, HasIQ: rc.HasIQ,
+			IQHz: rc.IQHz, Delta: rc.Delta, Limit: rc.Limit, Agree: rc.Agree,
+			Short: rc.Short, Basis: rc.Basis, Warning: rc.Warning})
+	}
+	return out, nil
+}
+
 // iqChecks measures each run from the IQ recording that covers its key-down
 // minute: the run's own recording if there is one, else the shortest that
 // covers it.
@@ -142,7 +236,7 @@ func (r *pdfReport) recSummary() {
 			iqs, d = commaHz(rc.IQHz, 3), fmt.Sprintf("%+.3f", rc.Delta)
 			ag = map[bool]string{true: "yes", false: "NO"}[rc.Agree]
 		}
-		rows = append(rows, []string{rv.Title, commaHz(rc.WHz, 3), iqs, d, ag, commaHz(rc.Hz, 2), rc.Short})
+		rows = append(rows, []string{rv.Title, commaHz(rc.WHz, 3), iqs, d, ag, commaHz(round2(rc.Hz), 2), rc.Short})
 	}
 	r.h2("IQ cross-check and recommendation")
 	r.table([]string{"Run", "WSJT-X Hz", "IQ Hz (whole minute)", "IQ - WSJT-X", "Agree", "Submit (0.01 Hz)", "Basis"},
@@ -218,7 +312,7 @@ func (r *pdfReport) iqSection(rv RunView) {
 				fmt.Sprintf("           = %s Hz  +/- %.4f Hz", commaHz(rc.Hz, 4), rc.SEM))
 		}
 	}
-	rows = append(rows, fmt.Sprintf("Recommended to submit: %s Hz", commaHz(rc.Hz, 2)), "  "+rc.Basis)
+	rows = append(rows, fmt.Sprintf("Recommended to submit: %s Hz", commaHz(round2(rc.Hz), 2)), "  "+rc.Basis)
 	r.math(rows...)
 	if rc.Warning != "" {
 		r.note("CHECK: " + rc.Warning)

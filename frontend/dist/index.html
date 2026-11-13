@@ -246,6 +246,7 @@ function showTab(t){
   document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on', s.id==='tab-'+t));
   safeSet('tab', t);
   if(t==='iq' && S) iqLoad();
+  if(t==='results' && S) loadRec();
 }
 
 // Replace a panel's HTML unless the user is typing in it.
@@ -953,15 +954,50 @@ function runDetail(rv){
   return h+'</div>';
 }
 
+// The value to submit per run, with its IQ cross-check: the same
+// recommendation the PDF report makes (App.Recommendations). Fetched only
+// while the Results tab is open; the Go side caches the IQ measurements.
+let REC=null, recBusy=false, recAt=0, recKey='';
+function resultsOpen(){ const t=document.getElementById('tab-results'); return t&&t.classList.contains('on') }
+function recFor(rv){
+  if(!REC||rv.final_hz==null) return null;
+  const r=REC.find(x=>x.run_id===rv.run.id);
+  return r && Math.abs(r.w_hz-rv.final_hz)<1e-6 ? r : null; // stale if the answer has changed since
+}
+async function loadRec(){
+  if(recBusy||!S||!resultsOpen()) return;
+  const key=JSON.stringify(S.runs.map(rv=>[rv.run.id, rv.final_hz, rv.result&&rv.result.sem]));
+  if(key===recKey && Date.now()-recAt<10000) return;
+  recBusy=true;
+  try{
+    const r=await api().Recommendations();
+    const changed=JSON.stringify(r)!==JSON.stringify(REC);
+    REC=r; recKey=key; recAt=Date.now();
+    if(changed) renderResults();
+  }catch(e){ console.error(e) } finally{ recBusy=false }
+}
+function recCells(rv){
+  if(rv.final_hz==null) return '<td class="n">-</td><td class="n">-</td><td class="n">-</td><td class="n">-</td><td>-</td>';
+  const rc=recFor(rv);
+  const w=`<td class="n">${rv.final_hz.toFixed(3)}</td>`;
+  if(!rc) return w+`<td class="n hint">checking…</td><td class="n">-</td><td class="n"><span class="answer" style="font-size:16px;opacity:.5">${fmtAns(rv.final_hz)}</span></td><td class="hint">checking IQ…</td>`;
+  const iq = rc.has_iq ? `<td class="n">${rc.iq_hz.toFixed(3)}</td><td class="n" style="color:var(${rc.agree?'--ok':'--err'})" title="They agree within ±${rc.limit.toFixed(3)} Hz">${(rc.delta>=0?'+':'')+rc.delta.toFixed(3)}${rc.agree?'':' ✗'}</td>`
+                       : `<td class="n hint" title="${esc(rc.basis)}">none</td><td class="n">-</td>`;
+  const basis = `<td title="${esc(rc.basis)}"${rc.warning?' style="color:var(--err);font-weight:600"':''}>${esc(rc.short)}</td>`;
+  return w+iq+`<td class="n"><span class="answer ${rv.ready&&!rc.warning?'ok':''}" style="font-size:16px">${fmtAns(rc.hz)}</span></td>`+basis;
+}
 function renderResults(){
+  const warns=S.runs.map(rv=>{ const rc=recFor(rv); return rc&&rc.warning?`<li class="warn"><b>${esc(rv.title)}:</b> ${esc(rc.warning)}</li>`:'' }).join('');
   let h=`<div class="card"><h2>Measurements to submit</h2><div class="hint">For each run, enter the <b>Carrier frequency</b> on the ARRL FMT data entry page; that is your answer.
-    Dial, Mean fMeas and Correction show how it was worked out (Carrier = Dial + Mean fMeas − Correction) and are not submitted.
+    It is the WSJT-X answer (Carrier = Dial + Mean fMeas − Correction) or, when a FlexRadio IQ recording covers the run's key-down minute and agrees with it,
+    the uncertainty-weighted average of the two, exactly as the PDF report recommends. <b>Basis</b> says which; hover it for the reason.
     Only runs marked <b>Ready</b> have passed every check; fix any others (Run analysis tab) before you submit them.</div>
-    <table style="margin-top:10px"><tr><th>Run</th><th>Key-down</th><th class="n">Dial</th><th class="n">Mean fMeas</th><th class="n">Correction</th><th class="n">Carrier frequency</th><th>Status</th></tr>
+    <table style="margin-top:10px"><tr><th>Run</th><th>Key-down</th><th class="n">Dial</th><th class="n">Mean fMeas</th><th class="n">Correction</th><th class="n">WSJT-X Hz</th><th class="n">IQ Hz</th><th class="n">IQ − WSJT-X</th><th class="n">Carrier frequency</th><th>Basis</th><th>Status</th></tr>
     ${S.runs.map(rv=>`<tr><td>${esc(rv.title)}</td><td>${hhmm(rv.run.key_down)}Z</td><td class="n">${rv.run.dial_hz?fmtHz(rv.run.dial_hz):'-'}</td>
       <td class="n">${rv.result&&rv.result.n?rv.result.mean_fmeas.toFixed(3):'-'}</td><td class="n">${rv.corr_hz!=null?rv.corr_hz.toFixed(3):'-'}</td>
-      <td class="n"><span class="answer ${rv.ready?'ok':''}" style="font-size:16px">${rv.final_hz!=null?fmtAns(rv.final_hz):'-'}</span></td>
+      ${recCells(rv)}
       <td>${statusChip(rv.ready, rv.present, [...(rv.issues||[]),...((rv.result&&rv.result.issues)||[])])}</td></tr>`).join('')}</table>
+    ${warns?'<ul class="issues">'+warns+'</ul>':''}
     <div class="row" style="margin-top:12px"><button class="primary" onclick="makeReport()">Save report &amp; show</button><button class="primary" onclick="makePDF()" title="All results with the full working, the calibration fits and charts of WWV and station Doppler, to share">Save PDF report</button><button onclick="copyResults()">Copy results</button><button onclick="api().OpenSessionFolder()">Open session folder</button>
       <button onclick="openURL('https://fmt.arrl.org/fmtentry.php')">ARRL FMT data entry page ↗</button></div>
     <div id="reportOut">${reportText?'<pre class="report">'+esc(reportText)+'</pre>':''}</div></div>`;
@@ -971,6 +1007,7 @@ function renderResults(){
     <div class="stgrid">${got.map(rv=>`<div><h4>${esc(rv.title)} <span class="hint" style="font-weight:400">${rv.result.n?'n='+rv.result.n+' · σ '+rv.result.sd.toFixed(3)+' Hz · σ/√N '+rv.result.sem.toFixed(3)+' Hz':''}</span></h4>${chart(rv.result, rv, {w:440, h:150, key:false})}</div>`).join('')}</div>
     ${chartKey(20,true)}<div class="hint">Filled dots were used for the answer; hollow ones were strong but left out.</div></div>`;
   put('resultsPanel', h);
+  loadRec();
 }
 
 function renderAbout(){
@@ -1020,12 +1057,13 @@ function outcomeCard(){
   const modes=[['none','No correction'],['before','Before'],['after','After'],['average','Average']];
   const errCell=(v,on)=>v==null?'<td class="n">-</td>':`<td class="n" style="${on?'font-weight:600':''}">${(v>=0?'+':'')+v.toFixed(3)}</td>`;
   let h=`<div class="card"><h2>How close were you?</h2><div class="hint">When the ARRL publishes the results (${link('https://fmt.arrl.org/','fmt.arrl.org')}), type each station's published frequency here, in Hz or kHz.
-    The app shows how far off each answer was, what each correction choice would have given (the one your answer used is in bold), and what the errors suggest. It never changes your answers.</div>
-    <table style="margin-top:10px"><tr><th>Run</th><th>Published frequency</th><th class="n">Your answer</th><th class="n">Error, Hz</th><th class="n">ppb</th>${modes.map(m=>`<th class="n">${m[1]}</th>`).join('')}</tr>
+    The app shows how far off each answer was (the WSJT-X answer, and the recommended one you submitted), what each correction choice would have given (the one your answer used is in bold), and what the errors suggest. It never changes your answers.</div>
+    <table style="margin-top:10px"><tr><th>Run</th><th>Published frequency</th><th class="n">WSJT-X answer</th><th class="n">Error, Hz</th><th class="n">ppb</th><th class="n" title="Error of the Carrier frequency in the table above (WSJT-X, or WSJT-X and IQ weighted)">Recommended error</th>${modes.map(m=>`<th class="n">${m[1]}</th>`).join('')}</tr>
     ${S.runs.map(rv=>{ const o=rv.outcome, r=rv.run; return `<tr><td>${esc(rv.title)}</td>
       <td><input class="num" style="width:150px" placeholder="e.g. 7062512.34" value="${esc(r.published_text||'')}" onchange="setPublished('${r.id}',this)"> <span class="hint">${r.published_hz?('= '+fmtHz(r.published_hz)):(r.published_text?'not a frequency':'')}</span></td>
       <td class="n">${rv.final_hz!=null?fmtHz(rv.final_hz):'-'}</td>
       ${o?`<td class="n"><b>${(o.err_hz>=0?'+':'')+o.err_hz.toFixed(3)}</b></td><td class="n">${(o.err_ppb>=0?'+':'')+o.err_ppb.toFixed(1)}</td>`:'<td class="n">-</td><td class="n">-</td>'}
+      ${(()=>{ const rc=recFor(rv); if(!o||!rc) return '<td class="n">-</td>'; const e=rc.hz-o.published_hz; return `<td class="n" title="${esc(rc.short)}">${(e>=0?'+':'')+e.toFixed(3)}</td>` })()}
       ${modes.map(m=>{ const v=o&&o.by_mode[m[0]]!=null?o.by_mode[m[0]]:null; return errCell(v, v!=null&&Math.abs(v-o.err_hz)<1e-9) }).join('')}</tr>` }).join('')}</table>`;
   if(S.outcome_notes&&S.outcome_notes.length) h+='<h3>What the errors suggest</h3><ul class="steps">'+S.outcome_notes.map(n=>`<li>${esc(n)}</li>`).join('')+'</ul>';
   h+=`<h3>Ask an AI</h3><div class="hint">Builds a prompt with your method, frequency reference, calibrations, every run's readings and the published frequencies (if entered),
@@ -1048,7 +1086,9 @@ async function showAIPrompt(){
 }
 async function makeReport(){ try{ reportText=await api().Report(); renderResults(); toast('Saved the results report (FMT <event> <callsign> results.txt) in the session folder.') }catch(e){ toast(String(e),true) } }
 async function copyResults(){
-  const t=S.runs.map(rv=>`${rv.title}: ${rv.final_hz!=null?rv.final_hz.toFixed(2)+' Hz':'n/a'}${rv.ready?'':' (check)'}`).join('\r\n');
+  try{ REC=await api().Recommendations(); recAt=Date.now() }catch(e){}
+  const t=S.runs.map(rv=>{ const rc=recFor(rv); const hz=rc?rc.hz:rv.final_hz;
+    return `${rv.title}: ${hz!=null?hz.toFixed(2)+' Hz':'n/a'}${rc?' ('+rc.short+')':''}${rv.ready&&!(rc&&rc.warning)?'':' (check)'}` }).join('\r\n');
   await window.runtime.ClipboardSetText(t); toast('Results copied.');
 }
 

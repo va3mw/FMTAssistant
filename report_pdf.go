@@ -34,7 +34,7 @@ func (a *App) SavePDFReport() (string, error) {
 		radio = strings.TrimSpace(snap.Model + ` "` + snap.Nickname + `"`)
 	}
 	r := newPDFReport(st, radio)
-	r.iq = a.iqChecks(st)
+	r.iq, r.rec = a.recommendations(st)
 	r.build()
 	p := filepath.Join(st.Dir, outFileName(st.Session, "report", ".pdf"))
 	if err := r.pdf.OutputFileAndClose(p); err != nil {
@@ -439,21 +439,6 @@ func yRange(v []float64, minHalf float64) (float64, float64) {
 func (r *pdfReport) build() {
 	p := r.pdf
 	st := r.st
-	r.rec = map[string]recommendation{}
-	for _, rv := range st.Runs {
-		if rv.FinalHz == nil {
-			continue
-		}
-		sem := 0.0
-		if rv.Result != nil {
-			sem = rv.Result.SEM
-		}
-		var v *IQAnalysisView
-		if c := r.iq[rv.Run.ID]; c != nil && c.Err == "" {
-			v = c.View
-		}
-		r.rec[rv.Run.ID] = recommend(*rv.FinalHz, sem, v)
-	}
 	s := st.Session
 	p.AddPage()
 	p.SetFont("Helvetica", "B", 18)
