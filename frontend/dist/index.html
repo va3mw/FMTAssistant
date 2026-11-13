@@ -811,8 +811,11 @@ function liveRun(rv){
     const df=meanSD(recent.map(l=>l.df)).mean, off=recent[recent.length-1].offset;
     if(Math.abs(df)>25) warn.push({level:'warn', msg:`The tone is at ${(off+df).toFixed(1)} Hz, ${sgn(df,1)} Hz from ${off} Hz. The dial is off or this is the wrong station: use Tone is at… and retune${r.id==='practice'?'':' (before the last 30 seconds)'}.`});
   }
-  const khz=[...new Set(L.lines.filter(strong).slice(-30).map(l=>l.khz))];
-  if(khz.length>1) warn.push({level:'warn', msg:`Recent readings come from more than one frequency (${khz.join(', ')} kHz). Is the calibration cycle still on in WSJT-X? Turn it off for the runs, and press Capture between steps.`});
+  // A change of Offset alone changes the kHz column too; only warn when no
+  // single dial fits the recent readings (kHz = (dial + Offset)/1000, truncated).
+  const rec30=L.lines.filter(strong).slice(-30), khz=[...new Set(rec30.map(l=>l.khz))];
+  const dlo=Math.max(...rec30.map(l=>l.khz*1000-l.offset)), dhi=Math.min(...rec30.map(l=>l.khz*1000-l.offset+999));
+  if(khz.length>1 && dlo>dhi) warn.push({level:'warn', msg:`Recent readings come from more than one frequency (${khz.join(', ')} kHz). Is the calibration cycle still on in WSJT-X? Turn it off for the runs, and press Capture between steps.`});
   if(keyed || r.id==='practice'){
     const sd=steadiness(vals);
     if(sd.two) warn.push({level:'warn', msg:`Readings fall into two groups ${sd.gap.toFixed(2)} Hz apart. The calibration cycle may be switching, the dial was touched, or there is QRM: check the WSJT-X waterfall.`});

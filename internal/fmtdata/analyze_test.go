@@ -120,3 +120,38 @@ func TestRunRejectsCalibrationFile(t *testing.T) {
 		t.Fatal("calibration file accepted as a run")
 	}
 }
+
+// Changing WSJT-X's Offset (Rx frequency) during the carrier changes the
+// logged kHz and Offset but not the dial; only a real dial change is an error.
+func TestRunOffsetChangeIsNotDialChange(t *testing.T) {
+	const dial = 7062500
+	build := func(second func(i int) (khz, off int)) *RunResult {
+		var b strings.Builder
+		kd := 2*3600 + 34*60
+		for i := 0; i < 24; i++ {
+			khz, off := (dial+1500)/1000, 1500
+			if i >= 12 {
+				khz, off = second(i)
+			}
+			b.WriteString(line(kd+3+i*2, khz, off, 1500.137, 35) + "\n")
+		}
+		f, err := Parse(strings.NewReader(b.String()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return AnalyzeRun(f, RunOptions{MinSNR: 20, KeyDownStart: kd, KeyDownEnd: kd + 60})
+	}
+	// Offset 1500 -> 1400: kHz goes 7064 -> 7063 (7063.9 truncated).
+	res := build(func(int) (int, int) { return (dial + 1400) / 1000, 1400 })
+	if HasErrors(res.Issues) {
+		t.Fatalf("offset change flagged: %+v", res.Issues)
+	}
+	if dial < res.DialMin || dial > res.DialMax || res.DialMax-res.DialMin != 99 {
+		t.Fatalf("dial range %d-%d", res.DialMin, res.DialMax)
+	}
+	// Dial moved by 2 kHz at the same Offset: an error.
+	res = build(func(int) (int, int) { return (dial + 2000 + 1500) / 1000, 1500 })
+	if !HasErrors(res.Issues) {
+		t.Fatalf("dial move not flagged: %+v", res.Issues)
+	}
+}

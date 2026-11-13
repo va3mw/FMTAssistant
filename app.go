@@ -471,7 +471,7 @@ func (a *App) checkRun(r *session.Run, res *fmtdata.RunResult, f *fmtdata.File, 
 	if r.DialHz > 0 {
 		d := int64(math.Round(r.DialHz))
 		if d < res.DialMin || d > res.DialMax {
-			add("error", "The dial %s does not match the file. WSJT-X logged %d kHz with the tone at %d Hz, so the dial must be between %s and %s. Check for a typo.",
+			add("error", "The dial %s does not match the file. From the kHz and Offset columns WSJT-X logged (%d kHz at Offset %d Hz), the dial must be between %s and %s. Check for a typo.",
 				khzStr(r.DialHz), res.KHz, res.Offset, khzStr(float64(res.DialMin)), khzStr(float64(res.DialMax)))
 		}
 		if r.RadioDialHz != 0 && math.Abs(float64(r.RadioDialHz)-r.DialHz) >= 1 {
