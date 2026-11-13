@@ -1010,6 +1010,23 @@ function renderResults(){
   loadRec();
 }
 
+// Check for updates (About tab): asks GitHub for the latest release. It
+// never installs anything; it links to the release page and the .exe.
+let UPD={busy:false, info:null, err:''};
+async function checkUpdate(){
+  UPD={busy:true, info:null, err:''}; renderAbout();
+  try{ UPD.info=await api().CheckForUpdate() }catch(e){ UPD.err=String(e) }
+  UPD.busy=false; renderAbout();
+}
+function updateHTML(){
+  if(UPD.err) return `<ul class="issues"><li class="error">Could not check for updates: ${esc(UPD.err)}</li></ul>`;
+  const u=UPD.info; if(!u) return '';
+  if(!u.newer) return `<ul class="issues"><li class="ok" style="background:var(--ok-bg);color:var(--ok)">You have the latest version (v${esc(u.current)}${u.latest&&u.latest!==u.current?', latest release v'+esc(u.latest):''}).</li></ul>`;
+  return `<ul class="issues"><li class="warn"><b>Version ${esc(u.latest)} is available</b>${u.published?' (released '+esc(u.published)+')':''}; you have v${esc(u.current)}.
+    ${u.download_url?link(u.download_url,'Download FMTAssistant.exe')+' · ':''}${link(u.url,'Release page')}
+    <div class="hint" style="margin-top:4px">Close FMT Assistant, replace the old FMTAssistant.exe with the new one, and start it again. Your sessions are kept.</div>
+    ${u.notes?'<pre class="report" style="margin-top:6px;max-height:160px;overflow:auto">'+esc(u.notes)+'</pre>':''}</li></ul>`;
+}
 function renderAbout(){
   const h=`<div class="grid2"><div>
   <div class="card"><h2>FMT Assistant v${esc(S.version)}</h2>
@@ -1022,6 +1039,8 @@ function renderAbout(){
       <b>License</b><span>MIT, © 2026 Michael VA3MW. Free to use, copy and change.</span>
       <b>Source</b><span>${link('https://github.com/va3mw/FMTAssistant','github.com/va3mw/FMTAssistant')}</span>
     </div>
+    <div class="row" style="margin-top:10px"><button onclick="checkUpdate()" ${UPD.busy?'disabled':''}>${UPD.busy?'Checking…':'Check for updates'}</button></div>
+    ${updateHTML()}
   </div>
   <div class="card"><h2>The ARRL FMT</h2>
     <ul class="steps">

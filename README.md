@@ -847,6 +847,12 @@ The version, author and license, and links to the
 these instructions, the latest release, and the issue tracker. Links open in your
 web browser. The Results tab also has an **ARRL FMT data entry page** button.
 
+**Check for updates** asks GitHub for the latest release and tells you whether you
+have it. If a newer version is out, it shows the release notes with links to
+download the new `FMTAssistant.exe` and to the release page. It never installs
+anything: close FMT Assistant, replace the old `.exe` with the new one, and start it
+again. Your sessions are kept.
+
 ## Checks and warnings, and what to do about them
 
 **Red** messages are errors: the run isn't Ready until they're fixed. **Amber**
