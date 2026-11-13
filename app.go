@@ -1138,16 +1138,38 @@ func (a *App) Report() (string, error) {
 		fmt.Fprintf(&b, "Callsign: %s\n", s.Callsign)
 	}
 	fmt.Fprintf(&b, "Prepared by FMT Assistant %s on %s UTC\n\n", version, time.Now().UTC().Format("2006-01-02 15:04"))
-	fmt.Fprintf(&b, "RESULTS\n")
+	_, recs := a.recommendations(st)
+	fmt.Fprintf(&b, "RESULTS (submit these)\n")
 	for _, r := range st.Runs {
-		if r.FinalHz != nil {
-			flag := ""
-			if !r.Ready {
-				flag = "   (CHECK: has unresolved problems)"
-			}
-			fmt.Fprintf(&b, "  %-12s %15s Hz%s\n", r.Title, fmt.Sprintf("%.2f", *r.FinalHz), flag)
-		} else {
+		rc, ok := recs[r.Run.ID]
+		if r.FinalHz == nil || !ok {
 			fmt.Fprintf(&b, "  %-12s   not available\n", r.Title)
+			continue
+		}
+		flag := ""
+		if !r.Ready {
+			flag = "   (CHECK: has unresolved problems)"
+		}
+		fmt.Fprintf(&b, "  %-12s %15.2f Hz   %s%s\n", r.Title, round2(rc.Hz), rc.Short, flag)
+	}
+	fmt.Fprintf(&b, "\nIQ CROSS-CHECK\n")
+	for _, r := range st.Runs {
+		rc, ok := recs[r.Run.ID]
+		if !ok {
+			continue
+		}
+		if !rc.HasIQ {
+			fmt.Fprintf(&b, "  %-12s WSJT-X %15.3f Hz   %s\n", r.Title, rc.WHz, rc.Basis)
+			continue
+		}
+		agree := "agree"
+		if !rc.Agree {
+			agree = "DISAGREE"
+		}
+		fmt.Fprintf(&b, "  %-12s WSJT-X %15.3f Hz   IQ %15.3f Hz   IQ-WSJT-X %+.3f Hz (limit %.3f) %s\n",
+			r.Title, rc.WHz, rc.IQHz, rc.Delta, rc.Limit, agree)
+		if rc.Warning != "" {
+			fmt.Fprintf(&b, "    WARNING: %s\n", rc.Warning)
 		}
 	}
 	if len(st.OutcomeNotes) > 0 {
