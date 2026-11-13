@@ -14,6 +14,7 @@ import (
 
 	"github.com/va3mw/FMTAssistant/internal/fmtdata"
 	"github.com/va3mw/FMTAssistant/internal/iq"
+	"github.com/va3mw/FMTAssistant/internal/session"
 )
 
 // The PDF report: every result with all of its arithmetic, the calibration
@@ -35,11 +36,7 @@ func (a *App) SavePDFReport() (string, error) {
 	r := newPDFReport(st, radio)
 	r.iq = a.iqChecks(st)
 	r.build()
-	name := "FMT report.pdf"
-	if c := strings.TrimSpace(st.Session.Callsign); c != "" {
-		name = "FMT report " + safeName(c) + ".pdf"
-	}
-	p := filepath.Join(st.Dir, name)
+	p := filepath.Join(st.Dir, outFileName(st.Session, "report", ".pdf"))
 	if err := r.pdf.OutputFileAndClose(p); err != nil {
 		return "", fmt.Errorf("writing the PDF: %w", err)
 	}
@@ -50,6 +47,32 @@ func (a *App) SavePDFReport() (string, error) {
 // OpenFile opens a file with its default program (e.g. the PDF report).
 func (a *App) OpenFile(p string) {
 	_ = exec.Command("explorer", p).Start()
+}
+
+// fmtEvent names the FMT event a session is for, e.g. "Nov 2026", from the
+// earliest run key-down (the test night), falling back to today.
+func fmtEvent(s *session.Session) string {
+	var t time.Time
+	for _, r := range s.Runs {
+		if !r.KeyDown.IsZero() && (t.IsZero() || r.KeyDown.Before(t)) {
+			t = r.KeyDown
+		}
+	}
+	if t.IsZero() {
+		t = time.Now().UTC()
+	}
+	return t.UTC().Format("Jan 2006")
+}
+
+// outFileName builds a saved file's name from the event and the operator's
+// callsign, e.g. "FMT Nov 2026 VA3MW results.txt".
+func outFileName(s *session.Session, kind, ext string) string {
+	parts := []string{"FMT", fmtEvent(s)}
+	if c := strings.TrimSpace(s.Callsign); c != "" {
+		parts = append(parts, c)
+	}
+	parts = append(parts, kind)
+	return safeName(strings.Join(parts, " ")) + ext
 }
 
 func safeName(s string) string {

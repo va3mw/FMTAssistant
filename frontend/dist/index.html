@@ -103,6 +103,7 @@ select{max-width:100%}
 .bigdial{font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent)}
 .answer{font-family:var(--mono);font-size:20px;font-weight:700}
 .answer.ok{color:var(--ok)}
+.paste{user-select:all;-webkit-user-select:all;cursor:text}
 .status{font-size:12px;font-weight:600;border-radius:5px;padding:2px 7px}
 .status.ok{background:var(--ok-bg);color:var(--ok)}
 .status.wait{background:var(--chip);color:var(--muted)}
@@ -227,6 +228,8 @@ function safeSet(k,v){ try{ localStorage.setItem(k,v) }catch(e){} }
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])) }
 function commas(n){ return Math.trunc(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') }
 function fmtKHz(hz){ if(!hz) return '-'; const k=Math.round(hz)/1000; const w=Math.floor(k); return commas(w)+'.'+String(Math.round((k-w)*1000)).padStart(3,'0')+' kHz' }
+// fmtAns shows an answer as plain Hz (no commas, 2 decimals) for pasting into the ARRL FMT entry page; one click selects just the number.
+function fmtAns(hz){ if(hz==null) return '-'; return '<span class="paste" title="Click to select, then copy">'+hz.toFixed(2)+'</span> Hz' }
 function fmtHz(hz){ if(hz==null) return '-'; let w=Math.floor(hz), c=Math.round((hz-w)*100); if(c===100){w++;c=0} return commas(w)+'.'+String(c).padStart(2,'0')+' Hz' }
 function hhmm(t){ const d=new Date(t); return d.toISOString().substr(11,5) }
 function hhmmss(t){ return new Date(t).toISOString().substr(11,8) }
@@ -537,7 +540,7 @@ function runCard(rv, idx){
             ${flexOn?`<button class="small" onclick="useRadioDial('${r.id}')">From radio</button>`:''}</span>
           <b>Mean fMeas</b><span class="mono">${res&&res.n? res.mean_fmeas.toFixed(3)+' Hz (n='+res.n+', sd '+res.sd.toFixed(2)+')':'-'}</span>
           <b>Correction</b><span class="mono">${rv.corr_hz!=null? (rv.corr_hz>=0?'+':'')+rv.corr_hz.toFixed(3)+' Hz':'-'}</span>
-          <b>Carrier</b><span class="answer ${rv.ready?'ok':''}">${rv.final_hz!=null? fmtHz(rv.final_hz):'-'}</span>
+          <b>Carrier</b><span class="answer ${rv.ready?'ok':''}">${rv.final_hz!=null? fmtAns(rv.final_hz):'-'}</span>
           ${refLine(r.slot.ref)}
           ${rv.slice_err_hz!=null?`<b>Slice tuning error</b><span class="mono">${(rv.slice_err_hz*1000>=0?'+':'')+(rv.slice_err_hz*1000).toFixed(1)} mHz <span class="hint">(added to the dial)</span></span>`:''}
         </div>
@@ -934,7 +937,7 @@ function runDetail(rv){
       <div><div class="hint">Mean fMeas (n=${res.n})</div><div class="answer">${res.n?res.mean_fmeas.toFixed(3)+' Hz':'-'}</div></div>
       <div><div class="hint">SD / SEM</div><div class="answer">${res.n>1?res.sd.toFixed(3)+' / '+res.sem.toFixed(3):'-'}</div></div>
       <div><div class="hint">Dial must be in</div><div class="answer" style="font-size:15px">${res.n?fmtKHz(res.dial_min)+' - '+fmtKHz(res.dial_max):'-'}</div></div>
-      <div><div class="hint">Carrier</div><div class="answer ${rv.ready?'ok':''}">${rv.final_hz!=null?fmtHz(rv.final_hz):'-'}</div></div></div>`;
+      <div><div class="hint">Carrier</div><div class="answer ${rv.ready?'ok':''}">${rv.final_hz!=null?fmtAns(rv.final_hz):'-'}</div></div></div>`;
     h+=chart(res, rv);
     h+=issuesHTML([...(rv.issues||[]), ...(res.issues||[])]);
     h+=`<h3>Readings</h3>
@@ -957,7 +960,7 @@ function renderResults(){
     <table style="margin-top:10px"><tr><th>Run</th><th>Key-down</th><th class="n">Dial</th><th class="n">Mean fMeas</th><th class="n">Correction</th><th class="n">Carrier frequency</th><th>Status</th></tr>
     ${S.runs.map(rv=>`<tr><td>${esc(rv.title)}</td><td>${hhmm(rv.run.key_down)}Z</td><td class="n">${rv.run.dial_hz?fmtHz(rv.run.dial_hz):'-'}</td>
       <td class="n">${rv.result&&rv.result.n?rv.result.mean_fmeas.toFixed(3):'-'}</td><td class="n">${rv.corr_hz!=null?rv.corr_hz.toFixed(3):'-'}</td>
-      <td class="n"><span class="answer ${rv.ready?'ok':''}" style="font-size:16px">${rv.final_hz!=null?fmtHz(rv.final_hz):'-'}</span></td>
+      <td class="n"><span class="answer ${rv.ready?'ok':''}" style="font-size:16px">${rv.final_hz!=null?fmtAns(rv.final_hz):'-'}</span></td>
       <td>${statusChip(rv.ready, rv.present, [...(rv.issues||[]),...((rv.result&&rv.result.issues)||[])])}</td></tr>`).join('')}</table>
     <div class="row" style="margin-top:12px"><button class="primary" onclick="makeReport()">Save report &amp; show</button><button class="primary" onclick="makePDF()" title="All results with the full working, the calibration fits and charts of WWV and station Doppler, to share">Save PDF report</button><button onclick="copyResults()">Copy results</button><button onclick="api().OpenSessionFolder()">Open session folder</button>
       <button onclick="openURL('https://fmt.arrl.org/fmtentry.php')">ARRL FMT data entry page ↗</button></div>
@@ -1026,7 +1029,7 @@ function outcomeCard(){
       ${modes.map(m=>{ const v=o&&o.by_mode[m[0]]!=null?o.by_mode[m[0]]:null; return errCell(v, v!=null&&Math.abs(v-o.err_hz)<1e-9) }).join('')}</tr>` }).join('')}</table>`;
   if(S.outcome_notes&&S.outcome_notes.length) h+='<h3>What the errors suggest</h3><ul class="steps">'+S.outcome_notes.map(n=>`<li>${esc(n)}</li>`).join('')+'</ul>';
   h+=`<h3>Ask an AI</h3><div class="hint">Builds a prompt with your method, frequency reference, calibrations, every run's readings and the published frequencies (if entered),
-    and asks for the likely causes of each error and what to change next time. Paste it into the AI chat of your choice. It's also saved as "FMT AI prompt.txt" in the session folder.</div>
+    and asks for the likely causes of each error and what to change next time. Paste it into the AI chat of your choice. It's also saved as "FMT &lt;event&gt; &lt;callsign&gt; AI prompt.txt" in the session folder.</div>
     <div class="row" style="margin-top:8px"><button class="primary" onclick="copyAIPrompt()">Copy AI prompt</button><button onclick="showAIPrompt()">${aiText?'Hide prompt':'Show prompt'}</button></div>
     <div id="aiOut">${aiText?'<pre class="report">'+esc(aiText)+'</pre>':''}</div></div>`;
   return h;
@@ -1037,13 +1040,13 @@ async function setPublished(id, el){
   refresh();
 }
 async function copyAIPrompt(){
-  try{ const t=await api().AIPrompt(); await window.runtime.ClipboardSetText(t); toast('Prompt copied, and saved as "FMT AI prompt.txt" in the session folder.') }catch(e){ toast(String(e),true) }
+  try{ const t=await api().AIPrompt(); await window.runtime.ClipboardSetText(t); toast('Prompt copied, and saved as "FMT <event> <callsign> AI prompt.txt" in the session folder.') }catch(e){ toast(String(e),true) }
 }
 async function showAIPrompt(){
   if(aiText){ aiText=''; renderResults(); return }
   try{ aiText=await api().AIPrompt(); renderResults() }catch(e){ toast(String(e),true) }
 }
-async function makeReport(){ try{ reportText=await api().Report(); renderResults(); toast('Saved "FMT results.txt" in the session folder.') }catch(e){ toast(String(e),true) } }
+async function makeReport(){ try{ reportText=await api().Report(); renderResults(); toast('Saved the results report (FMT <event> <callsign> results.txt) in the session folder.') }catch(e){ toast(String(e),true) } }
 async function copyResults(){
   const t=S.runs.map(rv=>`${rv.title}: ${rv.final_hz!=null?rv.final_hz.toFixed(2)+' Hz':'n/a'}${rv.ready?'':' (check)'}`).join('\r\n');
   await window.runtime.ClipboardSetText(t); toast('Results copied.');
@@ -1116,7 +1119,7 @@ function renderPractice(){
     <div class="kv">
       <b>Mean fMeas</b><span class="mono">${pv.result&&pv.result.n? pv.result.mean_fmeas.toFixed(3)+' Hz (n='+pv.result.n+', sd '+pv.result.sd.toFixed(2)+')':'-'}</span>
       <b>Correction</b><span class="mono">${pv.corr_hz!=null? (pv.corr_hz>=0?'+':'')+pv.corr_hz.toFixed(3)+' Hz':'-'}</span>
-      <b>Carrier</b><span class="answer ${pv.ready?'ok':''}">${pv.final_hz!=null? fmtHz(pv.final_hz):'-'}</span>
+      <b>Carrier</b><span class="answer ${pv.ready?'ok':''}">${pv.final_hz!=null? fmtAns(pv.final_hz):'-'}</span>
       <b>vs nominal</b><span class="answer">${dev!=null? (dev>=0?'+':'')+dev.toFixed(2)+' Hz':'-'}</span>
     </div>
     ${dev!=null?`<div class="hint" style="margin-top:4px">${isWWV?'WWV is exact at the transmitter: within ±0.1 Hz is excellent for a calibrated radio, a few hundredths with a GPS-locked one.':'Broadcast carriers are often 1-2 Hz off nominal. Compare with other nights rather than expecting zero.'}</div>`:''}
