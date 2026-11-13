@@ -427,6 +427,11 @@ func AnalyzeRun(f *File, opt RunOptions) *RunResult {
 	var vals []float64
 	first, last := -1, -1
 	khzCount, offCount := map[int]int{}, map[int]int{}
+	// Each line puts the dial in a 1 kHz range: WSJT-X logs
+	// kHz = (dial + Offset) / 1000, truncated. Changing the Offset (the Rx
+	// audio frequency) moves the line's kHz and Offset but not the dial, so
+	// the dial only moved if the ranges have nothing in common.
+	var lo, hi int64 = math.MinInt64, math.MaxInt64
 	for i, l := range lines {
 		if !l.Used {
 			continue
@@ -434,6 +439,8 @@ func AnalyzeRun(f *File, opt RunOptions) *RunResult {
 		vals = append(vals, l.FMeas)
 		khzCount[l.KHz]++
 		offCount[l.Offset]++
+		lo = max(lo, int64(l.KHz)*1000-int64(l.Offset))
+		hi = min(hi, int64(l.KHz)*1000-int64(l.Offset)+999)
 		if first < 0 {
 			first = i
 		}
@@ -449,14 +456,17 @@ func AnalyzeRun(f *File, opt RunOptions) *RunResult {
 		res.SEM = res.SD / math.Sqrt(float64(res.N))
 	}
 	res.KHz, res.Offset = mode(khzCount), mode(offCount)
-	if len(khzCount) > 1 || len(offCount) > 1 {
-		res.Issues = append(res.Issues, errorf("The readings used come from more than one dial setting (kHz %v, offsets %v). The dial was moved during the carrier; keep only one setting.", keys(khzCount), keys(offCount)))
+	if lo > hi {
+		res.Issues = append(res.Issues, errorf("The readings used come from more than one dial setting (kHz %v, offsets %v): no single dial fits them all. The dial was moved during the carrier; keep only one setting.", keys(khzCount), keys(offCount)))
 	}
 	res.BlockFrom, res.BlockTo = lines[first].Time, lines[last].Time
 	res.MidSec = (lines[first].Sec + SecDiff(lines[last].Sec, lines[first].Sec)/2 + 86400) % 86400
 	// WSJT-X: kHz = (dial + offset) / 1000, truncated.
-	res.DialMin = int64(res.KHz)*1000 - int64(res.Offset)
-	res.DialMax = res.DialMin + 999
+	res.DialMin, res.DialMax = lo, hi
+	if lo > hi { // dial moved: show the range of the commonest setting
+		res.DialMin = int64(res.KHz)*1000 - int64(res.Offset)
+		res.DialMax = res.DialMin + 999
+	}
 
 	if _, isRef := LookupReference(res.KHz); isRef && !opt.AllowReference {
 		res.Issues = append(res.Issues, errorf("This file was measured at %s, a calibration frequency. It looks like a calibration file, not a test run.", fmtKHz(res.KHz)))

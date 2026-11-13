@@ -4,6 +4,10 @@
 #   - push a tag:   git tag v0.3.4 && git push origin v0.3.4
 #   - or Actions > Release > Run workflow, with a tag and the branch or
 #     commit to build (the tag is created on that commit).
+#   - or push a branch named release/<tag>, e.g. release/v0.3.4-test1: the
+#     branch's commit is built and released as <tag>. (Cloud Claude Code
+#     sessions can push branches but not tags or releases, so this is how
+#     they start one.) The branch can be deleted afterwards.
 #
 # A tag with a hyphen (v0.3.4-test1, v0.3.3-iq-test) becomes a pre-release,
 # so it never replaces the latest release. The tag must match the version in
@@ -13,6 +17,7 @@ name: Release
 on:
   push:
     tags: ["v*"]
+    branches: ["release/**"]
   workflow_dispatch:
     inputs:
       tag:
@@ -34,12 +39,16 @@ jobs:
   release:
     runs-on: windows-latest
     env:
-      TAG: ${{ inputs.tag || github.ref_name }}
+      TAG_IN: ${{ inputs.tag || github.ref_name }}
       GH_TOKEN: ${{ github.token }}
     defaults:
       run:
         shell: bash
     steps:
+      - name: Work out the tag
+        # the input, the pushed tag, or <tag> from a release/<tag> branch
+        run: echo "TAG=${TAG_IN#release/}" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || github.ref }}

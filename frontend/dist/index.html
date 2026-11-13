@@ -48,6 +48,7 @@ input.num{font-family:var(--mono)}
 input:focus,select:focus{outline:2px solid var(--focus);border-color:var(--accent)}
 .mono{font-family:var(--mono)}
 .muted{color:var(--muted)}
+tr.sel td{background:var(--sel, rgba(80,140,255,.10))}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .grow{flex:1}
 
@@ -198,12 +199,14 @@ pre.report{background:#0f141c;color:#d7e0ec;padding:12px;border-radius:8px;font-
   <span class="navsep"></span>
   <button data-tab="cal" onclick="showTab('cal')">Calibration<span class="badge" id="bCal" hidden></span></button>
   <button data-tab="runs" onclick="showTab('runs')">Run analysis<span class="badge" id="bRuns" hidden></span></button>
+  <button data-tab="iq" onclick="showTab('iq')">IQ analysis</button>
   <button data-tab="about" onclick="showTab('about')">About</button>
 </nav>
 <main>
   <section class="tab on" id="tab-night"><div class="layout"><div id="timeline"></div><div id="side"></div></div></section>
   <section class="tab" id="tab-cal"><div id="calPanel"></div></section>
   <section class="tab" id="tab-runs"><div id="runsPanel"></div></section>
+  <section class="tab" id="tab-iq"><div id="iqPanel"></div></section>
   <section class="tab" id="tab-results"><div id="resultsPanel"></div></section>
   <section class="tab" id="tab-practice"><div id="practicePanel"></div></section>
   <section class="tab" id="tab-setup"><div id="setupPanel"></div></section>
@@ -239,6 +242,7 @@ function showTab(t){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===t));
   document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on', s.id==='tab-'+t));
   safeSet('tab', t);
+  if(t==='iq' && S) iqLoad();
 }
 
 // Replace a panel's HTML unless the user is typing in it.
@@ -246,7 +250,15 @@ function put(id, html){
   const el=document.getElementById(id);
   if(el.contains(document.activeElement) && document.activeElement.matches('input,select')) return;
   if(lastJSON[id]===html) return;
+  // Rebuilding the HTML would put scrolled boxes back at the top and close
+  // open <details>; keep both, and the page's own scroll position.
+  const main=document.querySelector('main'), top=main? main.scrollTop : 0;
+  const scrolls=[...el.querySelectorAll('.scroll')].map(s=>[s.scrollTop, s.scrollLeft]);
+  const opened=[...el.querySelectorAll('details')].map(d=>d.open);
   lastJSON[id]=html; el.innerHTML=html;
+  el.querySelectorAll('.scroll').forEach((s,i)=>{ if(scrolls[i]){ s.scrollTop=scrolls[i][0]; s.scrollLeft=scrolls[i][1] } });
+  el.querySelectorAll('details').forEach((d,i)=>{ if(i<opened.length) d.open=opened[i] });
+  if(main) main.scrollTop=top;
 }
 
 // ------------------------------------------------------------------ audio
@@ -455,7 +467,7 @@ function render(){
   badge('bCal', S.cals.reduce((n,c)=>n+errCount(c.issues)+errCount(c.result&&c.result.issues),0));
   badge('bRuns', S.runs.reduce((n,r)=>n+errCount(r.result&&r.result.issues),0));
   badge('bSetup', errCount(S.wsjtx.issues)+errCount(f.issues));
-  renderTimeline(); renderSide(); renderCal(); renderRuns(); renderResults(); renderPractice(); renderSetup(); renderAbout();
+  renderTimeline(); renderSide(); renderCal(); renderRuns(); renderResults(); renderPractice(); renderSetup(); renderAbout(); renderIQ();
 }
 // openURL opens a link in the user's browser, not inside the app window.
 function openURL(u){ try{ window.runtime.BrowserOpenURL(u) }catch(e){ window.open(u,'_blank') } }
@@ -637,7 +649,7 @@ function linFit(xs, ys){
   if(!n) return {a:0,b:0}; if(!d) return {a:sy/n,b:0};
   return {a:(sx2*sy-sx*sxy)/d, b:(n*sxy-sx*sy)/d};
 }
-function niceSpan(x){ for(const s of [0.25,0.5,1,2,5,10,20,50,100,200,500]) if(x<=s) return s; return Math.ceil(x/500)*500 }
+function niceSpan(x){ for(const s of [0.01,0.025,0.05,0.1,0.25,0.5,1,2,5,10,20,50,100,200,500]) if(x<=s) return s; return Math.ceil(x/500)*500 }
 function snrClass(p, min){ if(p.flag||p.snr<min) return 'p0'; return p.snr<30?'p1': p.snr<40?'p2':'p3' }
 
 // stabilityChart plots readings as offsets in Hz from a reference (the mean
@@ -650,13 +662,14 @@ function stabilityChart(pts, o={}){
   const min=o.minSNR ?? 20, W=o.w||900, H=o.h||180;
   const used=pts.filter(p=>p.use), base=used.length? used : pts;
   const st=meanSD(base.map(p=>p.v)), ref=o.ref ?? st.mean;
-  const t0=pts[0].sec, rel=s=>sdiff(s,t0);
+  const t0=o.xr? o.xr[0] : pts[0].sec, rel=s=>sdiff(s,t0);
   let x0=0, x1=pts.reduce((m,p)=>Math.max(m,rel(p.sec)),0);
   if(o.kd){ x0=Math.min(x0,rel(o.kd[0])); x1=Math.max(x1,rel(o.kd[1])) }
+  if(o.xr){ x0=0; x1=sdiff(o.xr[1],o.xr[0]) }
   if(x1-x0<60) x1=x0+60;
   let far=Math.abs(st.mean-ref)+1.2*st.sd;
   for(const p of base) far=Math.max(far, 1.1*Math.abs(p.v-ref));
-  const span=niceSpan(Math.max(0.2,far)), dec=span<0.5?3:span<1?2:span<10?1:0;
+  const span=niceSpan(Math.max(o.minSpan ?? 0.2,far)), dec=span<0.05?4:span<0.5?3:span<1?2:span<10?1:0;
   const L=50, HW=64, PR=W-HW-14, T=10, B=H-20;
   const X=s=>L+(rel(s)-x0)/(x1-x0)*(PR-L);
   const Y=v=>{ const d=Math.max(-span,Math.min(span,v-ref)); return T+(span-d)/(2*span)*(B-T) };
@@ -668,7 +681,7 @@ function stabilityChart(pts, o={}){
       <line class="kdl" x1="${a.toFixed(1)}" x2="${a.toFixed(1)}" y1="${T}" y2="${B}"/><line class="kdl" x1="${b.toFixed(1)}" x2="${b.toFixed(1)}" y1="${T}" y2="${B}"/>
       <text x="${(a+3).toFixed(1)}" y="${T+11}">key-down</text>`;
   }
-  s+=band('floor', st.mean-0.05, st.mean+0.05);
+  if(!o.noFloor) s+=band('floor', st.mean-0.05, st.mean+0.05);
   if(base.length>1) s+=band('sigma', st.mean-st.sd, st.mean+st.sd);
   for(const k of [-1,-0.5,0,0.5,1]){
     const y=Y(ref+k*span).toFixed(1);
@@ -703,10 +716,18 @@ function linePt(l, min, use, hollow){
 // chart is the stability plot of a captured or loaded run file.
 function chart(res, rv, o={}){
   const r=rv.run, min=r.min_snr||20;
-  const pts=res.lines.map(l=>linePt(l, min, l.used, !l.used && !(l.flag||l.snr<min)));
+  let pts=res.lines.map(l=>linePt(l, min, l.used, !l.used && !(l.flag||l.snr<min)));
   const kd=started(r)? sod(r.key_down) : null;
-  return stabilityChart(pts, {minSNR:min, kd: kd!=null?[kd,kd+60]:null, ...o}) +
-    (o.key===false? '' : '<div class="hint">Filled dots were used for the answer; hollow ones were strong but left out (CW ID, edges, outliers or your choice).</div>');
+  // Show one minute either side of the key-down minute, unless a reading used
+  // for the answer lies outside it (then everything, so nothing used is hidden).
+  let xr=null, hidden=0;
+  if(kd!=null){
+    const a=kd-60, b=kd+120, inWin=p=>sdiff(p.sec,a)>=0 && sdiff(b,p.sec)>=0;
+    const win=pts.filter(inWin);
+    if(win.length && pts.every(p=>!p.use || inWin(p))){ hidden=pts.length-win.length; pts=win; xr=[a,b] }
+  }
+  return stabilityChart(pts, {minSNR:min, kd: kd!=null?[kd,kd+60]:null, xr, ...o}) +
+    (o.key===false? '' : `<div class="hint">Filled dots were used for the answer; hollow ones were strong but left out (CW ID, edges, outliers or your choice).${xr?' Showing one minute either side of key-down'+(hidden?`; ${hidden} reading${hidden>1?'s':''} outside it not shown`:'')+'.':''}</div>`);
 }
 
 // ------------------------------------------------------------------ live follow
@@ -732,9 +753,11 @@ function onLive(ev){
 // liveWanted is the step to follow now: the one on the schedule, or the one
 // the operator chose with Watch live.
 function liveWanted(now){
-  if(liveManual) return liveManual;
+  // A scheduled run always takes over from a step watched by hand, so each
+  // run gets its own live preview (and its own IQ recording).
   const p=phase(now);
-  if(p) return p.rv.run.id;
+  if(p){ if(liveManual && liveManual!==p.rv.run.id) liveManual=''; return p.rv.run.id }
+  if(liveManual) return liveManual;
   const ev=events(), at=id=>(ev.find(e=>e.id===id)||{}).t;
   const cs=at('calb-start'), ce=at('calb-stop'), ca=at('cala-start');
   if(cs && now>=cs && now<ce+4*60e3 && !S.cals[0].present) return 'cal_before';
@@ -799,8 +822,11 @@ function liveRun(rv){
     const df=meanSD(recent.map(l=>l.df)).mean, off=recent[recent.length-1].offset;
     if(Math.abs(df)>25) warn.push({level:'warn', msg:`The tone is at ${(off+df).toFixed(1)} Hz, ${sgn(df,1)} Hz from ${off} Hz. The dial is off or this is the wrong station: use Tone is at… and retune${r.id==='practice'?'':' (before the last 30 seconds)'}.`});
   }
-  const khz=[...new Set(L.lines.filter(strong).slice(-30).map(l=>l.khz))];
-  if(khz.length>1) warn.push({level:'warn', msg:`Recent readings come from more than one frequency (${khz.join(', ')} kHz). Is the calibration cycle still on in WSJT-X? Turn it off for the runs, and press Capture between steps.`});
+  // A change of Offset alone changes the kHz column too; only warn when no
+  // single dial fits the recent readings (kHz = (dial + Offset)/1000, truncated).
+  const rec30=L.lines.filter(strong).slice(-30), khz=[...new Set(rec30.map(l=>l.khz))];
+  const dlo=Math.max(...rec30.map(l=>l.khz*1000-l.offset)), dhi=Math.min(...rec30.map(l=>l.khz*1000-l.offset+999));
+  if(khz.length>1 && dlo>dhi) warn.push({level:'warn', msg:`Recent readings come from more than one frequency (${khz.join(', ')} kHz). Is the calibration cycle still on in WSJT-X? Turn it off for the runs, and press Capture between steps.`});
   if(keyed || r.id==='practice'){
     const sd=steadiness(vals);
     if(sd.two) warn.push({level:'warn', msg:`Readings fall into two groups ${sd.gap.toFixed(2)} Hz apart. The calibration cycle may be switching, the dial was touched, or there is QRM: check the WSJT-X waterfall.`});
@@ -814,7 +840,7 @@ function liveRun(rv){
 }
 function liveBlock(rv, w){
   const x=liveRun(rv), n=x.st.n;
-  return `<div class="livebox"><div class="row"><span class="tag">Live preview</span>
+  return `<div class="livebox"><div class="row"><span class="tag">Live preview</span>${iqBadge()}
       <span class="hint grow">Following fmt.all (${L.lines.length} line${L.lines.length===1?'':'s'}). Not the value to submit: press Capture, and the answer comes from the captured file.</span></div>
     <div class="lstats">
       <div><div class="hint">Good readings</div><div class="v">${n}</div></div>
@@ -864,7 +890,7 @@ function calLiveBlock(c){
     if(sd.two||sd.jumps>1) w.push({level:'warn', msg:`${s.label}: readings jump or split into two groups. Fading, QRM, or another station on frequency.`});
   }
   const nf=sts.filter(s=>s.included).length;
-  return `<div class="livebox"><div class="row"><span class="tag">Live preview</span>
+  return `<div class="livebox"><div class="row"><span class="tag">Live preview</span>${iqBadge()}
       <span class="hint grow">Following fmt.all (${L.lines.length} lines). The calibration used for the answers comes from the captured file.</span></div>
     <div class="lstats"><div><div class="hint">Stations in the fit</div><div class="v">${nf}</div></div>
       <div><div class="hint">Slope B</div><div class="v">${fit&&nf>1? fit.b.toFixed(4)+' ppm':'-'}</div></div>
@@ -911,7 +937,11 @@ function runDetail(rv){
       <div><div class="hint">Carrier</div><div class="answer ${rv.ready?'ok':''}">${rv.final_hz!=null?fmtHz(rv.final_hz):'-'}</div></div></div>`;
     h+=chart(res, rv);
     h+=issuesHTML([...(rv.issues||[]), ...(res.issues||[])]);
-    h+=`<h3>Readings</h3><div class="scroll"><table><tr><th class="n">Line</th><th>UTC</th><th class="n">kHz</th><th class="n">Offset</th><th class="n">fMeas</th><th class="n">DF</th><th class="n">S/N</th><th>Status</th><th>Use</th></tr>
+    h+=`<h3>Readings</h3>
+      <div class="hint" style="margin-bottom:6px"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--ok-bg);border:1px solid var(--line);vertical-align:-2px"></span>
+        <b>Only the green rows are used</b> to calculate the mean fMeas and the carrier (${res.lines.filter(l=>l.used).length} of ${res.lines.length}). The Status column says why each other row is left out.
+        <b>use</b> forces a row in, <b>drop</b> forces it out, <b>auto</b> lets the app decide; changes apply at once.</div>
+      <div class="scroll"><table><tr><th class="n">Line</th><th>UTC</th><th class="n">kHz</th><th class="n">Offset</th><th class="n">fMeas</th><th class="n">DF</th><th class="n">S/N</th><th>Status</th><th>Use</th></tr>
       ${res.lines.map(l=>`<tr class="${l.used?'used':''} ${(l.flag||l.snr<r.min_snr)?'weak':''} ${l.forced?'forced':''}"><td class="n">${l.n}</td><td class="mono">${l.time}</td><td class="n">${l.khz}</td><td class="n">${l.offset}</td>
         <td class="n">${l.fmeas.toFixed(3)}</td><td class="n">${l.df.toFixed(3)}</td><td class="n">${l.snr.toFixed(1)}${l.flag?'*':''}</td><td>${esc(l.status)}</td>
         <td><span class="seg">${['use','auto','drop'].map(v=>`<button class="${(l.forced?(l.used?'use':'drop'):'auto')===v?'on':''}" onclick="call('ToggleRunLine','${r.id}',${l.n},'${v}')">${v}</button>`).join('')}</span></td></tr>`).join('')}
@@ -929,7 +959,7 @@ function renderResults(){
       <td class="n">${rv.result&&rv.result.n?rv.result.mean_fmeas.toFixed(3):'-'}</td><td class="n">${rv.corr_hz!=null?rv.corr_hz.toFixed(3):'-'}</td>
       <td class="n"><span class="answer ${rv.ready?'ok':''}" style="font-size:16px">${rv.final_hz!=null?fmtHz(rv.final_hz):'-'}</span></td>
       <td>${statusChip(rv.ready, rv.present, [...(rv.issues||[]),...((rv.result&&rv.result.issues)||[])])}</td></tr>`).join('')}</table>
-    <div class="row" style="margin-top:12px"><button class="primary" onclick="makeReport()">Save report &amp; show</button><button onclick="copyResults()">Copy results</button><button onclick="api().OpenSessionFolder()">Open session folder</button>
+    <div class="row" style="margin-top:12px"><button class="primary" onclick="makeReport()">Save report &amp; show</button><button class="primary" onclick="makePDF()" title="All results with the full working, the calibration fits and charts of WWV and station Doppler, to share">Save PDF report</button><button onclick="copyResults()">Copy results</button><button onclick="api().OpenSessionFolder()">Open session folder</button>
       <button onclick="openURL('https://fmt.arrl.org/fmtentry.php')">ARRL FMT data entry page ↗</button></div>
     <div id="reportOut">${reportText?'<pre class="report">'+esc(reportText)+'</pre>':''}</div></div>`;
   h+=outcomeCard();
@@ -1192,9 +1222,148 @@ function flexSetup(f){
       <h3>Quick tune (DIGU, dial 1500 Hz below)</h3><div class="row">
       ${[2500,5000,10000,15000,20000].map(k=>`<button class="small" onclick="tuneTo(${k*1000-1500})">WWV ${k/1000}</button>`).join('')}
       ${S.runs.map(rv=>`<button class="small" onclick="tuneRun('${rv.run.id}')">${esc(rv.title)}</button>`).join('')}</div>
-      <div class="hint" style="margin-top:6px">Setting the radio also turns RIT off and sets the DIGU offset to 0, so the slice frequency is the true dial.</div>`;
+      <div class="hint" style="margin-top:6px">Setting the radio also turns RIT off and sets the DIGU offset to 0, so the slice frequency is the true dial.</div>
+      ${iqSetup(f)}`;
   }
   return h+issuesHTML(f.issues);
+}
+// IQ recording (DAX IQ of the slice's panadapter, for analysis afterwards).
+function iqBadge(){
+  const q=S&&S.flex&&S.flex.iq;
+  if(!q||!q.recording) return '';
+  return ` <span class="tag" title="${esc(q.status.file)}">● IQ ${q.status.seconds.toFixed(0)} s${q.status.lost?' · '+q.status.lost+' lost':''}</span>`;
+}
+function iqMB(b){ return (b/1048576).toFixed(b<1048576*10?1:0)+' MB' }
+function iqSetup(f){
+  const s=S.session.flex, q=f.iq||{}, st=q.status||{}, rate=s.iq_rate||24000, ch=s.iq_channel||1;
+  const mbMin=(rate*8*60/1048576).toFixed(0);
+  let h=`<h3>IQ recording (for analysis later)</h3>
+    <label class="chk"><input type="checkbox" ${s.record_iq?'checked':''} onchange="call('SetIQRecord',this.checked)"> Record the IQ of the slice's panadapter during each step, while it is followed live</label>
+    <div class="row" style="margin-top:6px"><span class="hint">DAX IQ channel</span>
+      <select id="iqCh" onchange="iqOpts()">${[1,2,3,4].map(c=>`<option ${c===ch?'selected':''}>${c}</option>`).join('')}</select>
+      <span class="hint">rate</span>
+      <select id="iqRate" onchange="iqOpts()">${[24000,48000,96000,192000].map(r=>`<option value="${r}" ${r===rate?'selected':''}>${r/1000} kHz</option>`).join('')}</select>
+      <span class="hint">about ${mbMin} MB a minute</span></div>
+    <div class="row" style="margin-top:6px">
+      ${q.recording? (q.manual?`<button onclick="call('StopIQ')">Stop IQ recording</button>`:'') : `<button onclick="call('StartIQ')">Record IQ now</button>`}
+      <button onclick="call('OpenIQFolder')">Open IQ folder</button></div>`;
+  if(q.recording) h+=`<div class="kv" style="margin-top:8px"><b>Recording</b><span><span class="status ok">${esc(q.step)}</span> ${st.seconds.toFixed(0)} s, ${iqMB(st.bytes)}, ${st.rate/1000} kHz, ${st.packets} packets${st.lost?', <b>'+st.lost+' lost</b>':''}</span>
+      <b>Centre</b><span class="mono">${fmtKHz(q.center_hz)}</span><b>File</b><span class="mono">${esc(st.file)}</span></div>`;
+  else if(q.last) h+=`<div class="kv" style="margin-top:8px"><b>Last</b><span>${esc(q.last.step)}: ${q.last.seconds.toFixed(0)} s, ${iqMB(q.last.bytes)}, ${q.last.rate/1000} kHz${q.last.lost?', '+q.last.lost+' packets lost':''}${q.last.err?' · '+esc(q.last.err):''}</span>
+      <b>File</b><span class="mono">${esc(q.last.file)}</span></div>`;
+  return h+`<div class="hint" style="margin-top:6px">The IQ covers the panadapter around its centre, so the carrier is at its RF frequency minus the centre. If the slice is outside the recorded band the panadapter is re-centred on the dial. Each WAV (left I, right Q, 32-bit float) has a .json beside it with the centre, dial, rate, timing, lost packets and every centre or dial change. Recording never changes the answer, and the app still never transmits.</div>`;
+}
+async function iqOpts(){ try{ await api().SetIQOptions(parseInt(document.getElementById('iqCh').value), parseInt(document.getElementById('iqRate').value)) }catch(e){ toast(String(e),true) } refresh() }
+// ------------------------------------------------------------------ IQ analysis
+const IQ={files:null, res:null, busy:'', err:''};
+async function iqLoad(){
+  try{ IQ.files=await api().ListIQFiles(); IQ.err='' }catch(e){ IQ.err=String(e) }
+  renderIQ();
+}
+function iqOptsNow(){
+  const g=id=>{ const el=document.getElementById(id); return el? el.value.trim() : '' };
+  const khz=parseFloat(g('iqExpect'));
+  return {expect_hz: khz>0? khz*1000:0, search_hz: parseFloat(g('iqSearch'))||0, min_snr: parseFloat(g('iqMin'))||0,
+    seg_sec: parseFloat(g('iqSeg'))||0, mirror: parseInt(g('iqMirror')||'0')};
+}
+async function iqAnalyze(path, runId){
+  const o=iqOptsNow(); o.run_id=runId||'';
+  // A run measured from a long recording looks where WSJT-X found it, unless
+  // a frequency is typed; the ±150 Hz default is for whole files.
+  if(runId && !document.getElementById('iqSearch').dataset.touched) o.search_hz=0;
+  IQ.busy=path+'|'+(runId||''); IQ.err=''; renderIQ();
+  try{ IQ.res=await api().AnalyzeIQ(path, o) }catch(e){ IQ.err=String(e); toast(String(e),true) }
+  IQ.busy=''; renderIQ();
+}
+function iqAnalyzeIdx(i, runId){ if(IQ.files&&IQ.files[i]) iqAnalyze(IQ.files[i].path, runId) }
+// iqRunsIn lists the runs whose key-down minute lies inside a recording.
+function iqRunsIn(f){
+  const m=f.meta; if(!m||!m.start_utc||m.start_utc.startsWith('0001')||!m.sample_rate) return [];
+  const t0=new Date(m.start_utc).getTime(), t1=t0+m.frames/m.sample_rate*1000;
+  return [...S.runs, ...(S.practice&&started(S.practice.run)?[S.practice]:[])].filter(rv=>{ const kd=new Date(rv.run.key_down).getTime(); return kd>=t0-5e3 && kd+60e3<=t1+5e3 });
+}
+async function iqBrowse(){ try{ const p=await api().BrowseIQFile(); if(p) iqAnalyze(p) }catch(e){ toast(String(e),true) } }
+function iqName(f){ const m=f.meta; return m? (m.title||m.step)+(m.slice?' · slice '+m.slice:'') : f.name }
+function iqDur(m){ return m&&m.sample_rate? m.frames/m.sample_rate : null }
+function renderIQ(){
+  if(!S) return;
+  const files=IQ.files, opt=iqOptsNow();
+  let h=`<div class="layout1"><div class="card"><div class="row"><h2 class="grow">IQ recordings</h2>
+      <button onclick="iqLoad()">Refresh</button><button onclick="iqBrowse()">Open another file…</button><button onclick="call('OpenIQFolder')">Open IQ folder</button></div>
+    <div class="hint">Measures the carrier straight from a FlexRadio IQ recording, independently of WSJT-X, as a cross-check. It never changes the answer you submit.</div>
+    <div class="row" style="margin-top:8px;flex-wrap:wrap">
+      <span class="hint">Look near</span><input id="iqExpect" class="num" style="width:110px" placeholder="dial + 1.5" value="${opt.expect_hz? opt.expect_hz/1000:''}"><span class="hint">kHz ±</span>
+      <input id="iqSearch" class="num" style="width:60px" value="${opt.search_hz||150}" oninput="this.dataset.touched=1"><span class="hint">Hz · segments</span>
+      <input id="iqSeg" class="num" style="width:50px" value="${opt.seg_sec||4}"><span class="hint">s · min SNR</span>
+      <input id="iqMin" class="num" style="width:50px" value="${opt.min_snr||15}"><span class="hint">dB · I/Q</span>
+      <select id="iqMirror"><option value="0" ${opt.mirror===0?'selected':''}>detect</option><option value="1" ${opt.mirror===1?'selected':''}>as recorded</option><option value="-1" ${opt.mirror===-1?'selected':''}>swapped</option></select></div>`;
+  if(IQ.err) h+=issuesHTML([{level:'error', msg:IQ.err}]);
+  if(files==null) h+='<div class="hint" style="margin-top:8px">Loading…</div>';
+  else if(!files.length) h+='<div class="hint" style="margin-top:8px">No recordings in this session yet. Turn on IQ recording in Setup & radio (FlexRadio), or open a file.</div>';
+  else h+=`<table style="margin-top:8px"><tr><th>Recording</th><th>Start (UTC)</th><th>Length</th><th>Rate</th><th>Centre</th><th>Size</th><th></th></tr>
+    ${files.map((f,i)=>{ const m=f.meta, d=iqDur(m); return `<tr${IQ.res&&IQ.res.path===f.path?' class="sel"':''}><td>${esc(iqName(f))}<div class="hint mono">${esc(f.name)}</div></td>
+      <td class="mono">${m&&m.start_utc&&!m.start_utc.startsWith('0001')? hhmmss(m.start_utc):'-'}</td><td>${f.recording?'<span class="status warn">recording</span>': d!=null? d.toFixed(0)+' s':'-'}</td>
+      <td>${m&&m.sample_rate? m.sample_rate/1000+' kHz':'-'}</td><td class="mono">${m? fmtKHz(m.center_hz):'-'}</td><td>${iqMB(f.bytes)}${m&&m.lost_packets?'<div class="hint">'+m.lost_packets+' packets lost</div>':''}</td>
+      <td style="white-space:normal"><button class="small${IQ.busy===f.path+'|'?'':' primary'}" ${IQ.busy?'disabled':''} onclick="iqAnalyzeIdx(${i})" title="Measure the whole recording">${IQ.busy===f.path+'|'?'Measuring…':'Measure'}</button>
+        ${iqRunsIn(f).filter(rv=>!m||rv.run.id!==m.step).map(rv=>`<button class="small" ${IQ.busy?'disabled':''} onclick="iqAnalyzeIdx(${i},'${rv.run.id}')" title="Measure only the ${esc(rv.title)} key-down minute from this recording">${IQ.busy===f.path+'|'+rv.run.id?'Measuring…':esc(rv.title)}</button>`).join('')}</td></tr>` }).join('')}</table>
+    <div class="hint">A recording that spans several runs (for example one made while a step was watched by hand) shows a button for each run in it: that measures only the run's key-down minute, near the carrier WSJT-X found.</div>`;
+  h+='</div>';
+  if(IQ.res) h+=iqResult(IQ.res);
+  h+='</div>';
+  put('iqPanel', h);
+}
+function hz3(hz){ if(hz==null) return '-'; const w=Math.floor(hz); let m=Math.round((hz-w)*1000), ww=w; if(m===1000){ww++;m=0} return commas(ww)+'.'+String(m).padStart(3,'0')+' Hz' }
+function iqResult(v){
+  const a=v.a, s=a.summary, m=v.meta;
+  let h=`<div class="card"><h2>${esc(v.title||v.name)}${v.partial?' <span class="status warn">still recording, measured so far</span>':''}</h2>
+    <div class="hint mono">${esc(v.path)}</div>`;
+  const kv=[];
+  if(s){
+    kv.push(['Carrier from IQ', `<b class="mono">${hz3(s.mean_rf_hz)}</b> ± ${s.sem.toFixed(4)} Hz <span class="hint">(raw, as the radio sees it; ${s.n} segments, SD ${s.sd.toFixed(4)} Hz${s.n>=3?', drift '+sgn(s.drift_hz_min,4)+' Hz/min':''})</span>`]);
+    kv.push(['Basis', esc(s.basis)+` <span class="hint">${s.from&&!s.from.startsWith('0001')? hhmmss(s.from)+'–'+hhmmss(s.to)+' UTC':''}</span>`]);
+    kv.push(['Audio equivalent', `<span class="mono">${s.mean_audio_hz.toFixed(4)} Hz</span> <span class="hint">above the dial${v.wsjtx_mean!=null?'; WSJT-X mean fMeas '+v.wsjtx_mean.toFixed(3)+' Hz ('+sgn(s.mean_audio_hz-v.wsjtx_mean,3)+')':''}</span>`]);
+    if(v.same_span_hz!=null) kv.push(['Same seconds as WSJT-X', `<span class="mono">${hz3(v.same_span_hz)}</span> <span class="hint">IQ over ${v.same_span_from}–${v.same_span_to} UTC only (${v.same_span_n} segments), the part of the minute WSJT-X measured; the whole minute is ${sgn(s.mean_rf_hz-v.same_span_hz,3)} Hz from it</span>`]);
+    if(v.corr_hz!=null) kv.push(['With the calibration', `<b class="mono">${hz3(v.iq_final_hz)}</b> <span class="hint">IQ carrier − ${v.corr_hz.toFixed(3)} Hz correction, as the app applies to the WSJT-X answer</span>`]);
+    if(v.app_final_hz!=null) kv.push(['App answer (WSJT-X)', `<span class="mono">${hz3(v.app_final_hz)}</span> <span class="hint">IQ ${sgn(v.diff_hz,3)} Hz from it</span>`]);
+    if(v.wwv_err_hz!=null) kv.push(['WWV', `${(v.wwv_hz/1e6)} MHz reads <b>${sgn(v.wwv_err_hz,4)} Hz</b> (${sgn(v.wwv_ppm,4)} ppm) <span class="hint">the radio's own error at this frequency, uncorrected</span>`]);
+  }
+  kv.push(['Recording', `${a.seconds.toFixed(1)} s at ${a.rate/1000} kHz, centre ${fmtKHz(a.center_hz)}${a.dial_hz?', dial '+fmtKHz(a.dial_hz):''}; looked ${fmtKHz(a.expect_hz)} ± ${a.search_hz} Hz; I/Q ${a.mirrored?'<b>swapped</b>':'as recorded'}${a.mirror_detected?' (detected)':''}${m&&m.lost_packets?'; '+m.lost_packets+' packets lost':''}${m&&m.reference?'; reference: '+esc(m.reference):''}`]);
+  h+=`<div class="kv" style="margin-top:8px">${kv.map(([k,x])=>`<b>${k}</b><span>${x}</span>`).join('')}</div>`;
+  h+=issuesHTML((a.notes||[]).map(n=>({level:'info', msg:n})));
+  const segs=a.segments||[];
+  if(segs.length){
+    const pts=segs.map(g=>({sec: g.t&&!g.t.startsWith('0001')? sod(g.t)+(new Date(g.t).getUTCMilliseconds()/1000) : g.sec, v:g.rf_hz, use:g.ok&&g.in,
+      snr: g.ok? 45:0, flag: !g.ok, hollow: g.ok&&!g.in,
+      label:`${g.t&&!g.t.startsWith('0001')?hhmmss(g.t)+' ':''}${hz3(g.rf_hz)} · SNR ${g.snr.toFixed(1)} dB${g.why?' · '+g.why:''}`}));
+    const kd=v.key_down? [sod(v.key_down), sod(v.key_down)+60] : null;
+    h+=`<h3>Carrier over time</h3>${stabilityChart(pts, {minSNR:20, kd, minSpan:0.01, noFloor:true, key:false})}<div class="hint"><span style="color:var(--muted)">±1σ band shaded.</span> Each dot is one ${a.seg_sec} s segment; grey ones are left out (weak, lost packets, re-centre or outlier), hollow ones are outside the key-down minute.</div>`;
+  }
+  if(a.spectrum&&a.spectrum.length) h+=`<h3>Average spectrum</h3>${iqSpectrum(a.spectrum, s? s.mean_rf_hz-a.expect_hz : null, a.search_hz)}
+    <div class="hint">Around ${fmtKHz(a.expect_hz)}; the shaded band is the search range${s?', the line the measured carrier':''}.</div>`;
+  if(segs.length) h+=`<details style="margin-top:8px"><summary>Segments (${segs.length})</summary><table><tr><th>UTC</th><th>Carrier</th><th>Audio</th><th>SNR dB</th><th>±</th><th></th></tr>
+    ${segs.map(g=>`<tr${g.ok&&g.in?'':' class="muted"'}><td class="mono">${g.t&&!g.t.startsWith('0001')?hhmmss(g.t):g.sec.toFixed(0)+' s'}</td><td class="mono">${hz3(g.rf_hz)}</td><td class="mono">${g.audio_hz.toFixed(4)}</td>
+      <td>${g.snr.toFixed(1)}</td><td class="mono">${g.sigma_hz.toFixed(5)}</td><td class="hint">${esc(g.why||(g.in?'':'outside key-down'))}</td></tr>`).join('')}</table></details>`;
+  h+=`<div class="hint" style="margin-top:8px">Measured in ${v.elapsed.toFixed(1)} s. The IQ is in the radio's own frequency frame, so it carries the same reference error as WSJT-X; only the calibration removes it. Differences of a few millihertz from the WSJT-X answer are normal.</div></div>`;
+  return h;
+}
+function iqSpectrum(sp, mark, search){
+  const W=900, H=180, L=50, R=W-14, T=10, B=H-22;
+  const x0=sp[0].hz, x1=sp[sp.length-1].hz, dbs=sp.map(p=>p.db);
+  const top=Math.ceil(Math.max(...dbs)/10)*10, bot=Math.max(top-80, Math.floor(Math.min(...dbs)/10)*10);
+  const X=hz=>L+(hz-x0)/(x1-x0)*(R-L), Y=db=>T+(top-Math.max(bot,Math.min(top,db)))/(top-bot)*(B-T);
+  let s=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Average spectrum around the expected carrier">`;
+  s+=`<rect class="kd" x="${X(-search).toFixed(1)}" y="${T}" width="${(X(search)-X(-search)).toFixed(1)}" height="${B-T}"/>`;
+  for(let db=bot; db<=top; db+=20){ const y=Y(db).toFixed(1); s+=`<line class="grid" x1="${L}" x2="${R}" y1="${y}" y2="${y}"/><text x="${L-5}" y="${(+y+4).toFixed(1)}" text-anchor="end">${db}</text>` }
+  const step=niceSpan((x1-x0)/6);
+  for(let hz=Math.ceil(x0/step)*step; hz<=x1; hz+=step){ s+=`<text x="${X(hz).toFixed(1)}" y="${H-6}" text-anchor="middle">${sgn(hz,0)||'0'}</text>` }
+  s+=`<text x="${R}" y="${H-6}" text-anchor="end">Hz</text><text x="${L-5}" y="${T+4}" text-anchor="end"></text>`;
+  s+=`<polyline class="mean" fill="none" points="${sp.map(p=>X(p.hz).toFixed(1)+','+Y(p.db).toFixed(1)).join(' ')}"/>`;
+  if(mark!=null) s+=`<line class="kdl" x1="${X(mark).toFixed(1)}" x2="${X(mark).toFixed(1)}" y1="${T}" y2="${B}"><title>carrier ${sgn(mark,3)} Hz</title></line>`;
+  return s+'</svg>';
+}
+async function makePDF(){
+  toast('Making the PDF report…');
+  try{ const p=await api().SavePDFReport(); toast('PDF report saved: '+p); api().OpenFile(p) }catch(e){ toast(String(e),true) }
 }
 async function flexConnect(){ const v=document.getElementById('flexSel').value; if(!v){ toast('Choose a radio first',true); return } call('FlexConnect', v) }
 async function saveRun(id){

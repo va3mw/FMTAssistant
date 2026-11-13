@@ -49,6 +49,9 @@ type App struct {
 	// live follow of fmt.all (live.go); liveMu is taken before mu, never after
 	liveMu sync.Mutex
 	live   *liveFollow
+
+	// DAX IQ recording (iqrec.go)
+	iq iqState
 }
 
 type cached struct {
@@ -73,6 +76,9 @@ func (a *App) startup(ctx context.Context) {
 	a.radio = flex.NewRadio(a.log, a.changed)
 	a.radio.OnSliceFreq = a.onSliceFreq
 	a.radio.OnReference = a.onReference
+	a.radio.OnPan = a.onIQPan
+	a.radio.OnStream = a.onIQStream
+	a.iq.rx = flex.NewReceiver(a.log)
 	a.disc = flex.NewDiscovery(a.log, a.changed)
 
 	dir := loadLastDir()
@@ -113,6 +119,7 @@ func (a *App) startup(ctx context.Context) {
 
 func (a *App) shutdown(context.Context) {
 	a.LiveFollow("")
+	a.iqShutdown()
 	a.radio.Disconnect()
 	a.disc.Stop()
 	a.log.Close()
@@ -185,6 +192,7 @@ type FlexView struct {
 	Snap    flex.Snapshot    `json:"snap"`
 	Slice   *flex.Slice      `json:"slice"`
 	Issues  []fmtdata.Issue  `json:"issues"`
+	IQ      IQView           `json:"iq"`
 }
 
 type State struct {
@@ -463,7 +471,7 @@ func (a *App) checkRun(r *session.Run, res *fmtdata.RunResult, f *fmtdata.File, 
 	if r.DialHz > 0 {
 		d := int64(math.Round(r.DialHz))
 		if d < res.DialMin || d > res.DialMax {
-			add("error", "The dial %s does not match the file. WSJT-X logged %d kHz with the tone at %d Hz, so the dial must be between %s and %s. Check for a typo.",
+			add("error", "The dial %s does not match the file. From the kHz and Offset columns WSJT-X logged (%d kHz at Offset %d Hz), the dial must be between %s and %s. Check for a typo.",
 				khzStr(r.DialHz), res.KHz, res.Offset, khzStr(float64(res.DialMin)), khzStr(float64(res.DialMax)))
 		}
 		if r.RadioDialHz != 0 && math.Abs(float64(r.RadioDialHz)-r.DialHz) >= 1 {
@@ -1242,6 +1250,7 @@ func (a *App) SetFlexEnabled(on bool) {
 	if on && !was {
 		a.restartFlex()
 	} else if !on {
+		a.iqKick()
 		a.radio.Disconnect()
 		a.disc.Stop()
 	}
@@ -1346,6 +1355,8 @@ func (a *App) flexView() FlexView {
 	v.Radios = a.disc.List()
 	v.Snap = a.radio.Snapshot()
 	v.Issues = append(v.Issues, flexRefIssues(v.Snap.Ref, a.sess.ExtDisciplined, time.Now())...)
+	v.IQ = a.iqView()
+	v.Issues = append(v.Issues, v.IQ.Issues...)
 	if sl, ok := v.Snap.SliceByLetter(a.sess.Flex.Slice); ok {
 		v.Slice = &sl
 		if sl.Mode != "DIGU" {
@@ -1373,6 +1384,7 @@ func (a *App) onSliceFreq(letter string, hz int64) {
 		a.freqLog = a.freqLog[len(a.freqLog)-5000:]
 	}
 	a.src.Debug("slice %s dial %s", letter, hzStr(float64(hz)))
+	a.onIQDial(hz)
 	// While a run's carrier is on, remember the dial for the cross-check.
 	now := time.Now().UTC()
 	runs := []*session.Run{&a.sess.Practice}

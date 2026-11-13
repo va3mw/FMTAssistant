@@ -86,6 +86,7 @@ for the minute-by-minute version. The rest of this README explains each step.
 13. [Troubleshooting](#troubleshooting)
 14. [How the numbers are calculated](#how-the-numbers-are-calculated)
 15. [How accurate is it?](#how-accurate-is-it)
+    - [WSJT-X may measure only half of the key-down minute](#wsjt-x-may-measure-only-half-of-the-key-down-minute)
 16. [Building from source](#building-from-source)
 17. [Credits](#credits)
 
@@ -350,6 +351,69 @@ frequency and mode.
 Warnings in the Flex panel tell you if the slice is not in DIGU, RIT is on, or a
 DIGU offset is set.
 
+#### IQ recording (optional, for analysis later)
+
+With a FlexRadio, the app can record the radio's IQ for the same frequency, at the
+same time WSJT-X is measuring, so you can analyse the carrier afterwards with
+other tools (Python, GNU Radio, Inspectrum, HDSDR, SDR#...).
+
+1. In the FlexRadio card, under **IQ recording**, tick **Record the IQ of the
+   slice's panadapter during each step**.
+2. Choose a **DAX IQ channel** (1 to 4) that SmartSDR's DAX panel isn't using, and a
+   **rate**. 24 kHz is plenty for one carrier and takes about 11 MB a minute; 192 kHz
+   takes about 88 MB a minute.
+3. Press **Record IQ now** to try it: the card shows seconds, size and packets. If
+   the packet count stays at 0, allow FMT Assistant through Windows Firewall on
+   private networks (the IQ arrives as UDP from the radio). Press **Stop IQ
+   recording** when done.
+
+From then on a recording runs for each step the app follows live (each calibration,
+each run from call-up to just after key-up, and practice), and the live preview
+shows an **● IQ** tag with the seconds recorded. A recording never changes the answer.
+
+DAX IQ carries the whole **panadapter** around its centre, not just the slice, so a
+signal at RF frequency *f* sits at *f − centre* in the recording. If the slice is
+outside the recorded band when a step starts (or when the dial moves), the app
+re-centres the panadapter on the dial. If the panadapter has no DAX IQ channel, the
+app gives it the one you chose and removes it again afterwards.
+
+Each recording is a pair of files in the session's `IQ` folder:
+
+- `<step> <UTC start> <dial> kHz.wav`: 2 channels of 32-bit float, left I, right Q,
+  at the stream's sample rate. It has an `auxi` chunk (the HDSDR / SDR# layout) with
+  the centre frequency and start time.
+- the same name with `.json`: centre and dial frequencies, expected carrier and its
+  offset from the centre, sample rate (and whether the radio reported it or it was
+  measured), the radio's first VITA-49 timestamp, host start and stop times, the
+  frequency reference, lost packets and where they were, and every centre or dial
+  change with the sample (frame) where it happened.
+
+**Reading a recording back.** The **IQ analysis** tab lists the session's
+recordings (or **Open another file…** for any 2-channel IQ WAV, 32-bit float or
+16-bit). **Measure** finds the carrier directly from the IQ, independently of
+WSJT-X: it mixes the recording down near the expected carrier (dial + 1500 Hz unless
+you type another frequency), cuts it into segments of a few seconds, takes the
+strongest peak within the search range, and refines it with a fit to the signal's
+phase. Segments that are weak, hold lost packets or a panadapter re-centre are left
+out. For a run, only the key-down minute is averaged, as WSJT-X's is.
+
+It shows the carrier as the radio sees it (to the millihertz, with its spread and
+drift), the same carrier with the calibration correction the app uses, the app's
+WSJT-X answer and the difference, a chart of every segment and the average spectrum.
+For a WWV recording it shows how far the radio reads WWV off nominal, in Hz and ppm.
+If the carrier is clearer with I and Q swapped, that is detected and reported.
+
+**A recording that spans several runs** (for example one made while a step was
+watched by hand, which kept one recording going all night) shows a button for each
+run whose key-down falls inside it. That reads only the run's key-down minute from
+the file, looks within ±20 Hz of the carrier WSJT-X found (dial + mean fMeas), and
+compares as above. It also shows the IQ carrier over just the seconds WSJT-X
+measured, next to the whole minute's, so you can see what the rest of the minute
+would have changed.
+
+The IQ covers the whole key-down minute even when WSJT-X only measured part of it
+(see [WSJT-X may measure only half of the key-down minute](#wsjt-x-may-measure-only-half-of-the-key-down-minute)).
+
 ## Step 2: Practice (Practice tab)
 
 Practise the whole process at least once before the real test. Practice FMTs are
@@ -550,6 +614,11 @@ By default the app uses the **average** of before and after (see the Calibration
    [review its readings](#run-analysis-tab).
 3. Press **Save report & show**. This writes `FMT results.txt` in the session folder,
    with the answers, both calibrations, every run's details and any warnings. Keep it.
+   **Save PDF report** writes `FMT report <callsign>.pdf` and opens it: a report to
+   share, with every reading used, the full working for each answer (mean, SD, SEM,
+   drift, the dial check, the correction A + B x f and the carrier sum), the
+   calibration fits, and charts of WWV Doppler during each calibration and the
+   station's Doppler around each key-down.
 4. **Copy results** puts the four answers on the clipboard.
 5. Enter your measurements on the ARRL **[FMT Data Entry page](https://fmt.arrl.org/fmtentry.php)**
    before the deadline (0200Z November 16 for the November 2026 test). The ARRL
@@ -820,7 +889,9 @@ messages are warnings worth a look. **Blue** messages are information.
 | `2_run1_W8RKO40m.all` … `5_run4_K5CM80m.all` | The four runs (names follow your schedule) |
 | `6_calibration_after.all` | Calibration after the runs |
 | `session.json` | Your schedule, dial entries, choices and settings |
+| `IQ\<step> <UTC time> <dial> kHz.wav` and `.json` | FlexRadio IQ recordings and their description, if IQ recording is on |
 | `FMT results.txt` | The report, written when you press Save report |
+| `FMT report <callsign>.pdf` | The PDF report with all the working and charts, written when you press Save PDF report |
 | `FMT AI prompt.txt` | The AI prompt, written when you press Copy AI prompt or Show prompt |
 | `*-replaced-*.all`, `*-removed-*.all` | Earlier files kept when you replace or remove one |
 | `Archive\<UTC time>_<file>.all` | A dated copy of every file captured or loaded, for example `Archive\20261113-023612Z_2_run1_W8RKO40m.all`. These are never overwritten or renamed, so the original readings of each step are always kept. |
@@ -997,6 +1068,50 @@ scatter was about 6 ppb from second to second, averaging down to about 0.5 ppb o
   test. Its apparent wobble shows how disturbed the ionosphere is. It's a different
   path, so it can't correct anything, but it tells you how far to trust each minute.
 
+### WSJT-X may measure only half of the key-down minute
+
+On the November 2026 test (VA3MW, WSJT-X v3.3.0-beta5 in FreqCal with T/R 30 s),
+every run's `fmt.all` had readings only from about **:04 to :29** of each minute,
+and nothing from :30 to :03. So of each one-minute carrier, only about **25 seconds
+(about 12 readings)** were measured:
+
+| Run | Readings in the key-down minute | Used (edges trimmed) | SD | SEM |
+|---|---|---|---|---|
+| K5CM 40 m | 02:49:04-02:49:29 | 10 | 0.04 Hz | 0.014 Hz |
+| W8RKO 80 m | 03:04:04-03:04:29 | 10 | 0.04 Hz | 0.013 Hz |
+| K5CM 80 m | 03:19:04-03:19:29 | 10 | 0.14 Hz | 0.043 Hz |
+
+That costs accuracy in two ways:
+
+- **Fewer readings.** Measuring 25 s instead of the whole minute makes the average's
+  noise (SEM) about √(60/25) ≈ 1.5 times larger. On a noisy run such as K5CM 80 m
+  above (weaker signal, S/N 30-57, readings swinging ±0.2 Hz), that matters.
+- **Only the first half of the carrier.** If the path Doppler drifts during the
+  minute, the answer is the frequency during the first half, not the average over
+  the whole minute, which is what you want.
+
+The cause isn't confirmed yet. It looks tied to WSJT-X's T/R period in FreqCal mode.
+Before the next test, check on the **Practice** tab with a steady carrier (an AM
+broadcast station or WWV) whether readings arrive for the whole minute, and try other
+T/R settings if they don't. The live preview and Run analysis show the times of every
+reading.
+
+**This is where IQ recording helps.** With a FlexRadio and [IQ recording](#iq-recording-optional-for-analysis-later)
+on, the radio's IQ is recorded continuously for the whole step, gaps or not. The
+**IQ analysis** tab then measures the carrier over the whole key-down minute (from
+5 s after key-down to 5 s before key-up), in 4-second segments refined with a fit
+to the signal's phase. That gives:
+
+- a measurement of the **second half of the minute** that WSJT-X missed, and of the
+  whole minute's average, to compare with the WSJT-X answer;
+- the carrier's **drift and Doppler through the full minute**, segment by segment, so
+  you can see whether the half WSJT-X measured was typical;
+- a check with much lower measurement noise than FreqCal's, so the remaining spread is
+  mostly the path itself.
+
+The answer you submit still comes from WSJT-X; use the IQ result to judge it (see
+[Reading a recording back](#iq-recording-optional-for-analysis-later)).
+
 **What doesn't help:** more decimal places, averaging beyond the one-minute key-down,
 or a WWV correction on a GPS-locked radio.
 
@@ -1053,7 +1168,9 @@ Personalization > Colors).
 | `outcome.go` | Comparison with the published frequencies, and the AI prompt |
 | `internal/fmtdata` | `fmt.all` parser, live follower, calibration fit, run analysis, and tests |
 | `internal/session` | The session (schedule, slots, settings), saved as `session.json` |
-| `internal/flex` | FlexRadio LAN discovery and SmartSDR API client (slice status, DIGU tune) |
+| `internal/flex` | FlexRadio LAN discovery and SmartSDR API client (slice and panadapter status, DIGU tune, DAX IQ stream) |
+| `internal/iq` | VITA-49 parsing, IQ WAV writer and recording metadata, and tests |
+| `iqrec.go` | Starts and stops IQ recording with each live step |
 | `internal/speech` | Windows SAPI voice |
 | `internal/logx` | Logger (daily log file) |
 | `frontend/dist/index.html` | The whole user interface |

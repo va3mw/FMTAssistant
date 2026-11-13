@@ -48,6 +48,7 @@ type liveFollow struct {
 func (a *App) LiveFollow(step string) LiveState {
 	a.liveMu.Lock()
 	defer a.liveMu.Unlock()
+	a.iqFollow(step)
 	if step == "" {
 		if a.live != nil {
 			close(a.live.stop)
