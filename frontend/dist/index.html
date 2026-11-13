@@ -935,7 +935,11 @@ function runDetail(rv){
       <div><div class="hint">Carrier</div><div class="answer ${rv.ready?'ok':''}">${rv.final_hz!=null?fmtHz(rv.final_hz):'-'}</div></div></div>`;
     h+=chart(res, rv);
     h+=issuesHTML([...(rv.issues||[]), ...(res.issues||[])]);
-    h+=`<h3>Readings</h3><div class="scroll"><table><tr><th class="n">Line</th><th>UTC</th><th class="n">kHz</th><th class="n">Offset</th><th class="n">fMeas</th><th class="n">DF</th><th class="n">S/N</th><th>Status</th><th>Use</th></tr>
+    h+=`<h3>Readings</h3>
+      <div class="hint" style="margin-bottom:6px"><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--ok-bg);border:1px solid var(--line);vertical-align:-2px"></span>
+        <b>Only the green rows are used</b> to calculate the mean fMeas and the carrier (${res.lines.filter(l=>l.used).length} of ${res.lines.length}). The Status column says why each other row is left out.
+        <b>use</b> forces a row in, <b>drop</b> forces it out, <b>auto</b> lets the app decide; changes apply at once.</div>
+      <div class="scroll"><table><tr><th class="n">Line</th><th>UTC</th><th class="n">kHz</th><th class="n">Offset</th><th class="n">fMeas</th><th class="n">DF</th><th class="n">S/N</th><th>Status</th><th>Use</th></tr>
       ${res.lines.map(l=>`<tr class="${l.used?'used':''} ${(l.flag||l.snr<r.min_snr)?'weak':''} ${l.forced?'forced':''}"><td class="n">${l.n}</td><td class="mono">${l.time}</td><td class="n">${l.khz}</td><td class="n">${l.offset}</td>
         <td class="n">${l.fmeas.toFixed(3)}</td><td class="n">${l.df.toFixed(3)}</td><td class="n">${l.snr.toFixed(1)}${l.flag?'*':''}</td><td>${esc(l.status)}</td>
         <td><span class="seg">${['use','auto','drop'].map(v=>`<button class="${(l.forced?(l.used?'use':'drop'):'auto')===v?'on':''}" onclick="call('ToggleRunLine','${r.id}',${l.n},'${v}')">${v}</button>`).join('')}</span></td></tr>`).join('')}
