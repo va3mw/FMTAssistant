@@ -16,7 +16,7 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
-const version = "0.3.4"
+const version = "0.3.5"
 
 func main() {
 	l := logx.New(filepath.Join(appDataDir(), "logs"))
