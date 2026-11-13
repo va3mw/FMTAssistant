@@ -662,9 +662,10 @@ function stabilityChart(pts, o={}){
   const min=o.minSNR ?? 20, W=o.w||900, H=o.h||180;
   const used=pts.filter(p=>p.use), base=used.length? used : pts;
   const st=meanSD(base.map(p=>p.v)), ref=o.ref ?? st.mean;
-  const t0=pts[0].sec, rel=s=>sdiff(s,t0);
+  const t0=o.xr? o.xr[0] : pts[0].sec, rel=s=>sdiff(s,t0);
   let x0=0, x1=pts.reduce((m,p)=>Math.max(m,rel(p.sec)),0);
   if(o.kd){ x0=Math.min(x0,rel(o.kd[0])); x1=Math.max(x1,rel(o.kd[1])) }
+  if(o.xr){ x0=0; x1=sdiff(o.xr[1],o.xr[0]) }
   if(x1-x0<60) x1=x0+60;
   let far=Math.abs(st.mean-ref)+1.2*st.sd;
   for(const p of base) far=Math.max(far, 1.1*Math.abs(p.v-ref));
@@ -715,10 +716,18 @@ function linePt(l, min, use, hollow){
 // chart is the stability plot of a captured or loaded run file.
 function chart(res, rv, o={}){
   const r=rv.run, min=r.min_snr||20;
-  const pts=res.lines.map(l=>linePt(l, min, l.used, !l.used && !(l.flag||l.snr<min)));
+  let pts=res.lines.map(l=>linePt(l, min, l.used, !l.used && !(l.flag||l.snr<min)));
   const kd=started(r)? sod(r.key_down) : null;
-  return stabilityChart(pts, {minSNR:min, kd: kd!=null?[kd,kd+60]:null, ...o}) +
-    (o.key===false? '' : '<div class="hint">Filled dots were used for the answer; hollow ones were strong but left out (CW ID, edges, outliers or your choice).</div>');
+  // Show one minute either side of the key-down minute, unless a reading used
+  // for the answer lies outside it (then everything, so nothing used is hidden).
+  let xr=null, hidden=0;
+  if(kd!=null){
+    const a=kd-60, b=kd+120, inWin=p=>sdiff(p.sec,a)>=0 && sdiff(b,p.sec)>=0;
+    const win=pts.filter(inWin);
+    if(win.length && pts.every(p=>!p.use || inWin(p))){ hidden=pts.length-win.length; pts=win; xr=[a,b] }
+  }
+  return stabilityChart(pts, {minSNR:min, kd: kd!=null?[kd,kd+60]:null, xr, ...o}) +
+    (o.key===false? '' : `<div class="hint">Filled dots were used for the answer; hollow ones were strong but left out (CW ID, edges, outliers or your choice).${xr?' Showing one minute either side of key-down'+(hidden?`; ${hidden} reading${hidden>1?'s':''} outside it not shown`:'')+'.':''}</div>`);
 }
 
 // ------------------------------------------------------------------ live follow
