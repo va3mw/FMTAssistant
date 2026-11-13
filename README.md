@@ -1063,6 +1063,13 @@ wails build -ldflags "-s -w"
 
 The program is written to `build\bin\FMTAssistant.exe`.
 
+**Releases** are built by GitHub Actions (`.github/workflows/release.yml`) on Windows:
+push a tag that matches the version in `main.go` and `wails.json` (for example
+`v0.3.4`), or run **Actions > Release > Run workflow** with a tag and the branch to
+build. The workflow tests, builds and publishes `FMTAssistant.exe` with its SHA-256.
+A tag with a hyphen (`v0.3.4-test1`) is published as a pre-release, so it never
+replaces the latest release.
+
 For development, `wails dev` runs the app with a browser view at
 http://localhost:34115. Set the environment variable `FMTASSISTANT_NO_LOCK=1` to
 run a development copy beside an installed one; without it, the second copy exits
