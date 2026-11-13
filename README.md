@@ -387,6 +387,21 @@ Each recording is a pair of files in the session's `IQ` folder:
   frequency reference, lost packets and where they were, and every centre or dial
   change with the sample (frame) where it happened.
 
+**Reading a recording back.** The **IQ analysis** tab lists the session's
+recordings (or **Open another file…** for any 2-channel IQ WAV, 32-bit float or
+16-bit). **Measure** finds the carrier directly from the IQ, independently of
+WSJT-X: it mixes the recording down near the expected carrier (dial + 1500 Hz unless
+you type another frequency), cuts it into segments of a few seconds, takes the
+strongest peak within the search range, and refines it with a fit to the signal's
+phase. Segments that are weak, hold lost packets or a panadapter re-centre are left
+out. For a run, only the key-down minute is averaged, as WSJT-X's is.
+
+It shows the carrier as the radio sees it (to the millihertz, with its spread and
+drift), the same carrier with the calibration correction the app uses, the app's
+WSJT-X answer and the difference, a chart of every segment and the average spectrum.
+For a WWV recording it shows how far the radio reads WWV off nominal, in Hz and ppm.
+If the carrier is clearer with I and Q swapped, that is detected and reported.
+
 ## Step 2: Practice (Practice tab)
 
 Practise the whole process at least once before the real test. Practice FMTs are
