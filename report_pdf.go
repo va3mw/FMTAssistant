@@ -6,12 +6,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/go-pdf/fpdf"
 
 	"github.com/va3mw/FMTAssistant/internal/fmtdata"
+	"github.com/va3mw/FMTAssistant/internal/iq"
 )
 
 // The PDF report: every result with all of its arithmetic, the calibration
@@ -515,27 +517,18 @@ func hzOrDash(hz float64, dec int) string {
 	return commaHz(hz, dec)
 }
 
-// commaHz formats Hz with thousands separators.
+// commaHz formats Hz with thousands separators and dec decimals.
 func commaHz(hz float64, dec int) string {
-	neg := hz < 0
-	hz = math.Abs(hz)
-	s := fmt.Sprintf("%.*f", dec, hz)
-	ip, fp, _ := strings.Cut(s, ".")
-	var b strings.Builder
-	for i, c := range ip {
-		if i > 0 && (len(ip)-i)%3 == 0 {
-			b.WriteByte(',')
-		}
-		b.WriteRune(c)
+	sign := ""
+	if hz < 0 {
+		sign, hz = "-", -hz
 	}
-	out := b.String()
+	ip, fp, _ := strings.Cut(fmt.Sprintf("%.*f", dec, hz), ".")
+	whole, _ := strconv.ParseInt(ip, 10, 64)
 	if fp != "" {
-		out += "." + fp
+		fp = "." + fp
 	}
-	if neg {
-		out = "-" + out
-	}
-	return out
+	return sign + commas(whole) + fp
 }
 
 func (r *pdfReport) calSection(c CalView) {
@@ -731,7 +724,7 @@ func (r *pdfReport) runSection(rv RunView) {
 	for _, l := range used {
 		xs, ys = append(xs, (unwrap(l.Sec, ref)-ref)/60), append(ys, l.FMeas)
 	}
-	slope, icpt, okFit := linfit(xs, ys)
+	slope, icpt, _, okFit := iq.LinFit(xs, ys)
 	if okFit && len(used) >= 3 {
 		math1 = append(math1, fmt.Sprintf("Drift      = least-squares slope of fMeas over time = %+.4f Hz/min", slope))
 	}
@@ -853,28 +846,4 @@ func (r *pdfReport) issues(rv RunView) {
 			r.note(l)
 		}
 	}
-}
-
-// linfit returns slope and intercept of y on x.
-func linfit(x, y []float64) (slope, icpt float64, ok bool) {
-	n := float64(len(x))
-	if n < 2 {
-		return 0, 0, false
-	}
-	var mx, my float64
-	for i := range x {
-		mx += x[i]
-		my += y[i]
-	}
-	mx, my = mx/n, my/n
-	var sxx, sxy float64
-	for i := range x {
-		sxx += (x[i] - mx) * (x[i] - mx)
-		sxy += (x[i] - mx) * (y[i] - my)
-	}
-	if sxx == 0 {
-		return 0, my, false
-	}
-	slope = sxy / sxx
-	return slope, my - slope*mx, true
 }

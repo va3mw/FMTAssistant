@@ -171,7 +171,7 @@ func Analyze(path string, meta *Meta, opt Options) (*Analysis, error) {
 	if off := opt.ExpectHz - float64(a.CenterHz); math.Abs(off)+opt.SearchHz > float64(w.Rate)/2 {
 		a.Notes = append(a.Notes, fmt.Sprintf("%.0f Hz is outside the recorded band (centre %d Hz, ±%d Hz).", opt.ExpectHz, a.CenterHz, w.Rate/2))
 	}
-	chains := []*chain{newChain(a, opt, w.Rate, false), newChain(a, opt, w.Rate, true)}
+	chains := []*chain{newChain(opt, w.Rate, false), newChain(opt, w.Rate, true)}
 	buf := make([]complex64, 1<<16)
 	for frame < end {
 		if rest := end - frame; rest < int64(len(buf)) {
@@ -301,7 +301,6 @@ func (t *timeline) dialAt(f int64) int64 {
 
 // chain measures one image (as recorded, or mirrored).
 type chain struct {
-	a       *Analysis
 	opt     Options
 	rate    float64
 	mirror  bool
@@ -323,12 +322,12 @@ type chain struct {
 	nfft    int
 }
 
-func newChain(a *Analysis, opt Options, rate int, mirror bool) *chain {
+func newChain(opt Options, rate int, mirror bool) *chain {
 	d1 := int(math.Round(float64(rate) / decimRate))
 	if d1 < 1 {
 		d1 = 1
 	}
-	c := &chain{a: a, opt: opt, rate: float64(rate), mirror: mirror, d1: d1, r1: float64(rate) / float64(d1)}
+	c := &chain{opt: opt, rate: float64(rate), mirror: mirror, d1: d1, r1: float64(rate) / float64(d1)}
 	c.segLen = int(opt.SegSec * c.r1)
 	c.nfft = nextPow2(c.segLen) * 4
 	return c
@@ -460,7 +459,7 @@ func (c *chain) measure() {
 			acc = 0
 		}
 	}
-	slope, se := linfit(ts, ph)
+	slope, _, se, _ := LinFit(ts, ph)
 	fine := slope / (2 * math.Pi)
 	if math.Abs(fine) > binHz*2 { // the fit slipped; keep the FFT estimate
 		fine, se = 0, binHz*2*math.Pi
@@ -504,11 +503,13 @@ func (c *chain) spectrum() []SpecPoint {
 	return out
 }
 
-// linfit returns the least-squares slope of y on x and its standard error.
-func linfit(x, y []float64) (slope, se float64) {
+// LinFit is the least-squares line y = icpt + slope*x, with the standard
+// error of the slope (infinite with fewer than 3 points). ok is false when
+// there are fewer than 2 points or all x are equal.
+func LinFit(x, y []float64) (slope, icpt, se float64, ok bool) {
 	n := float64(len(x))
-	if n < 3 {
-		return 0, math.Inf(1)
+	if n < 2 {
+		return 0, 0, math.Inf(1), false
 	}
 	var mx, my float64
 	for i := range x {
@@ -521,13 +522,20 @@ func linfit(x, y []float64) (slope, se float64) {
 		sxx += (x[i] - mx) * (x[i] - mx)
 		sxy += (x[i] - mx) * (y[i] - my)
 	}
+	if sxx == 0 {
+		return 0, my, math.Inf(1), false
+	}
 	slope = sxy / sxx
+	icpt = my - slope*mx
+	if n < 3 {
+		return slope, icpt, math.Inf(1), true
+	}
 	var ss float64
 	for i := range x {
 		r := y[i] - my - slope*(x[i]-mx)
 		ss += r * r
 	}
-	return slope, math.Sqrt(ss / (n - 2) / sxx)
+	return slope, icpt, math.Sqrt(ss / (n - 2) / sxx), true
 }
 
 // summarise averages the usable segments, those in the window if any are,
@@ -609,7 +617,7 @@ func summarise(segs []Segment, opt Options, start time.Time) *Summary {
 		sum.SD = 0
 	}
 	if sum.N >= 3 {
-		sum.DriftHzMin, _ = linfit(xs, ys)
+		sum.DriftHzMin, _, _, _ = LinFit(xs, ys)
 	}
 	return sum
 }

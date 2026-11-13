@@ -50,7 +50,15 @@ type Meta struct {
 	Events     []Event   `json:"events,omitempty"`
 	Notes      []string  `json:"notes,omitempty"`
 	Error      string    `json:"error,omitempty"`
+	// InProgress is set in the copies written while recording; a file left
+	// with it set was not closed (e.g. the app stopped), and holds the
+	// samples up to the last checkpoint.
+	InProgress bool `json:"in_progress,omitempty"`
 }
+
+// checkpointEvery is how often a recording's header and description are
+// brought up to date while it runs.
+const checkpointEvery = 15 * time.Second
 
 // VITATime is the radio's timestamp of the first packet.
 type VITATime struct {
@@ -89,21 +97,20 @@ type Recorder struct {
 	scratch []float32
 	err     error
 	closed  bool
-	t0      time.Time
+	lastCk  time.Time // last checkpoint (packet time)
 }
 
 // NewRecorder creates the WAV at path. meta is the description so far; the
 // recorder fills in the counts, times and rate.
 func NewRecorder(path string, meta Meta) (*Recorder, error) {
-	now := time.Now().UTC()
-	w, err := CreateWAV(path, now)
+	w, err := CreateWAV(path, time.Now().UTC(), meta.RequestedRate, meta.CenterHz)
 	if err != nil {
 		return nil, err
 	}
 	meta.Format = "WAV, 32-bit float, 2 channels: left I, right Q, as sent by the radio"
 	meta.ChannelOrder = "left=I right=Q"
 	meta.WAV = baseName(path)
-	return &Recorder{path: path, wav: w, meta: meta, t0: now}, nil
+	return &Recorder{path: path, wav: w, meta: meta}, nil
 }
 
 // Path is the WAV file.
@@ -165,7 +172,39 @@ func (r *Recorder) write(p Packet, at time.Time) {
 	if err := r.wav.Write(r.scratch); err != nil {
 		r.err = err
 		r.meta.Error = err.Error()
+		return
 	}
+	if at.Sub(r.lastCk) >= checkpointEvery {
+		r.lastCk = at
+		r.checkpointLocked()
+	}
+}
+
+// checkpointLocked makes the file readable as it stands: the WAV header and
+// the description are brought up to date. A failure is only noted; the
+// recording goes on.
+func (r *Recorder) checkpointLocked() {
+	m := r.meta
+	m.Frames, m.InProgress = r.wav.Frames(), true
+	m.SampleRate = r.rateLocked()
+	if err := r.wav.Sync(m.SampleRate, m.CenterHz, m.StopUTC); err != nil {
+		r.meta.Error = "checkpoint: " + err.Error()
+		return
+	}
+	if err := writeJSON(r.MetaPath(), &m); err != nil {
+		r.meta.Error = "checkpoint: " + err.Error()
+	}
+}
+
+// writeJSON writes v to path through a temporary file, so a crash never
+// leaves a half-written description.
+func writeJSON(path string, v any) error {
+	b, _ := json.MarshalIndent(v, "", "  ")
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // Event notes a change at the current position of the recording.
@@ -210,6 +249,8 @@ type Status struct {
 	Lost    int64   `json:"lost"`
 	Rate    int     `json:"rate"`
 	Err     string  `json:"err"`
+	// LastPacket is when the last packet arrived (zero before the first).
+	LastPacket time.Time `json:"last_packet"`
 }
 
 func (r *Recorder) Status() Status {
@@ -217,7 +258,7 @@ func (r *Recorder) Status() Status {
 	defer r.mu.Unlock()
 	rate := r.rateLocked()
 	s := Status{File: r.path, Frames: r.wav.Frames(), Bytes: r.wav.Bytes(), Packets: r.meta.Packets,
-		Lost: r.meta.Lost, Rate: rate, Err: r.meta.Error}
+		Lost: r.meta.Lost, Rate: rate, Err: r.meta.Error, LastPacket: r.meta.StopUTC}
 	if rate > 0 {
 		s.Seconds = float64(s.Frames) / float64(rate)
 	}
@@ -281,9 +322,9 @@ func (r *Recorder) Close() (Meta, error) {
 	if stop.IsZero() {
 		stop = time.Now().UTC()
 	}
+	m.InProgress = false
 	err := r.wav.Close(m.SampleRate, m.CenterHz, stop)
-	b, _ := json.MarshalIndent(m, "", "  ")
-	if e := os.WriteFile(r.MetaPath(), b, 0o644); err == nil {
+	if e := writeJSON(r.MetaPath(), m); err == nil {
 		err = e
 	}
 	if err != nil {

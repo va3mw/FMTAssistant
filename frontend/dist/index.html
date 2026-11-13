@@ -1255,7 +1255,7 @@ function iqSetup(f){
 }
 async function iqOpts(){ try{ await api().SetIQOptions(parseInt(document.getElementById('iqCh').value), parseInt(document.getElementById('iqRate').value)) }catch(e){ toast(String(e),true) } refresh() }
 // ------------------------------------------------------------------ IQ analysis
-const IQ={files:null, res:null, busy:'', err:''};
+const IQ={files:null, res:null, busy:'', err:'', searchTyped:false};
 async function iqLoad(){
   try{ IQ.files=await api().ListIQFiles(); IQ.err='' }catch(e){ IQ.err=String(e) }
   renderIQ();
@@ -1270,7 +1270,7 @@ async function iqAnalyze(path, runId){
   const o=iqOptsNow(); o.run_id=runId||'';
   // A run measured from a long recording looks where WSJT-X found it, unless
   // a frequency is typed; the ±150 Hz default is for whole files.
-  if(runId && !document.getElementById('iqSearch').dataset.touched) o.search_hz=0;
+  if(runId && !IQ.searchTyped) o.search_hz=0;
   IQ.busy=path+'|'+(runId||''); IQ.err=''; renderIQ();
   try{ IQ.res=await api().AnalyzeIQ(path, o) }catch(e){ IQ.err=String(e); toast(String(e),true) }
   IQ.busy=''; renderIQ();
@@ -1293,7 +1293,7 @@ function renderIQ(){
     <div class="hint">Measures the carrier straight from a FlexRadio IQ recording, independently of WSJT-X, as a cross-check. It never changes the answer you submit.</div>
     <div class="row" style="margin-top:8px;flex-wrap:wrap">
       <span class="hint">Look near</span><input id="iqExpect" class="num" style="width:110px" placeholder="dial + 1.5" value="${opt.expect_hz? opt.expect_hz/1000:''}"><span class="hint">kHz ±</span>
-      <input id="iqSearch" class="num" style="width:60px" value="${opt.search_hz||150}" oninput="this.dataset.touched=1"><span class="hint">Hz · segments</span>
+      <input id="iqSearch" class="num" style="width:60px" value="${opt.search_hz||150}" oninput="IQ.searchTyped=true"><span class="hint">Hz · segments</span>
       <input id="iqSeg" class="num" style="width:50px" value="${opt.seg_sec||4}"><span class="hint">s · min SNR</span>
       <input id="iqMin" class="num" style="width:50px" value="${opt.min_snr||15}"><span class="hint">dB · I/Q</span>
       <select id="iqMirror"><option value="0" ${opt.mirror===0?'selected':''}>detect</option><option value="1" ${opt.mirror===1?'selected':''}>as recorded</option><option value="-1" ${opt.mirror===-1?'selected':''}>swapped</option></select></div>`;

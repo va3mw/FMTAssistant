@@ -30,8 +30,8 @@ import (
 type iqState struct {
 	mu     sync.Mutex
 	rx     *flex.Receiver
-	live   string // step followed live now ("" none)
-	manual bool   // a recording started with Record IQ now
+	live   atomic.Pointer[string] // step followed live now ("" or nil: none)
+	manual bool                   // a recording started with Record IQ now
 	cur    atomic.Pointer[iqRec]
 
 	infoMu  sync.Mutex
@@ -44,7 +44,6 @@ type iqRec struct {
 	rec      *iq.Recorder
 	stream   uint32
 	pan      string
-	slice    string
 	rate     int
 	setDAX   bool // we gave the panadapter its DAX IQ channel; undone at the end
 	centerHz atomic.Int64
@@ -89,8 +88,15 @@ func (a *App) iqView() IQView {
 				"Allow FMT Assistant through Windows Firewall (private networks), and check that no other program holds DAX IQ channel " +
 				strconv.Itoa(a.sess.Flex.IQChannel) + "."})
 		}
+		// Packets stopped mid-recording: the radio dropped the stream or the
+		// connection.
+		if lp := v.Status.LastPacket; !lp.IsZero() && time.Since(lp) > 5*time.Second {
+			v.Issues = append(v.Issues, fmtdata.Issue{Level: "warn", Msg: fmt.Sprintf(
+				"No IQ packets for %.0f s: the radio has stopped sending the IQ stream. Check the radio and its network connection.",
+				time.Since(lp).Seconds())})
+		}
 		if v.Status.Err != "" {
-			v.Issues = append(v.Issues, fmtdata.Issue{Level: "error", Msg: "IQ recording stopped writing: " + v.Status.Err})
+			v.Issues = append(v.Issues, fmtdata.Issue{Level: "error", Msg: "IQ recording problem: " + v.Status.Err})
 		}
 	} else if v.Err != "" && a.sess.Flex.RecordIQ {
 		v.Issues = append(v.Issues, fmtdata.Issue{Level: "warn", Msg: "IQ recording: " + v.Err})
@@ -98,14 +104,12 @@ func (a *App) iqView() IQView {
 	return v
 }
 
-// iqFollow is told the step followed live (from LiveFollow).
+// iqFollow is told the step followed live (from LiveFollow). The step is
+// stored at once, so however the syncs that follow are ordered, the last
+// one sees the latest step.
 func (a *App) iqFollow(step string) {
-	go func() {
-		a.iq.mu.Lock()
-		a.iq.live = step
-		a.iq.mu.Unlock()
-		a.iqSync()
-	}()
+	a.iq.live.Store(&step)
+	go a.iqSync()
 }
 
 // iqKick re-evaluates after a setting changed.
@@ -124,7 +128,9 @@ func (a *App) iqSync() {
 	case a.iq.manual && flexOn:
 		want = "manual"
 	case on:
-		want = a.iq.live
+		if p := a.iq.live.Load(); p != nil {
+			want = *p
+		}
 	}
 	cur := a.iq.cur.Load()
 	if cur != nil && cur.step == want {
@@ -232,7 +238,7 @@ func (a *App) iqStartLocked(step string) error {
 		a.undoDAX(pan.ID, setDAX)
 		return err
 	}
-	c := &iqRec{step: step, rec: rec, pan: pan.ID, slice: sl.Letter, rate: rate, setDAX: setDAX, started: now}
+	c := &iqRec{step: step, rec: rec, pan: pan.ID, rate: rate, setDAX: setDAX, started: now}
 	c.centerHz.Store(pan.CenterHz)
 
 	id, rateErr, err := a.radio.StartDAXIQ(ch, rate)
@@ -300,7 +306,8 @@ func (a *App) undoDAX(pan string, set bool) {
 
 func (a *App) iqShutdown() {
 	a.iq.mu.Lock()
-	a.iq.manual, a.iq.live = false, ""
+	a.iq.manual = false
+	a.iq.live.Store(nil)
 	a.iqStopLocked()
 	a.iq.mu.Unlock()
 	a.iq.rx.Close()
