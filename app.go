@@ -1208,7 +1208,7 @@ func (a *App) Report() (string, error) {
 		}
 	}
 	text := b.String()
-	p := filepath.Join(st.Dir, "FMT results.txt")
+	p := filepath.Join(st.Dir, outFileName(st.Session, "results", ".txt"))
 	if err := os.WriteFile(p, []byte(strings.ReplaceAll(text, "\n", "\r\n")), 0o644); err != nil {
 		return text, err
 	}

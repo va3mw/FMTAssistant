@@ -361,7 +361,7 @@ func (a *App) AIPrompt() (string, error) {
 	}
 
 	text := b.String()
-	p := filepath.Join(st.Dir, "FMT AI prompt.txt")
+	p := filepath.Join(st.Dir, outFileName(st.Session, "AI prompt", ".txt"))
 	if err := os.WriteFile(p, []byte(strings.ReplaceAll(text, "\n", "\r\n")), 0o644); err != nil {
 		return text, err
 	}

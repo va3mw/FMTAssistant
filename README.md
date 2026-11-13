@@ -126,7 +126,7 @@ for the minute-by-minute version. The rest of this README explains each step.
   chart of every reading. It warns at once if readings stop, the tone is far from
   1500 Hz, or the readings jump. This is a preview; the answer still comes from
   Capture. See [Live readings and the stability chart](#live-readings-and-the-stability-chart).
-- **Results.** It shows the four answers, saves a full report (`FMT results.txt`)
+- **Results.** It shows the four answers, saves a full report (`FMT <event> <callsign> results.txt`)
   and has a Copy button.
 - **FlexRadio control (optional).** It finds your FlexRadio on the LAN and can set
   the slice to DIGU on the right dial, by button or automatically at each call-up.
@@ -612,9 +612,9 @@ By default the app uses the **average** of before and after (see the Calibration
    **carrier frequency**. **Ready** means every check passed.
 2. If a run isn't Ready, fix what its card says (usually a dial entry), or
    [review its readings](#run-analysis-tab).
-3. Press **Save report & show**. This writes `FMT results.txt` in the session folder,
+3. Press **Save report & show**. This writes `FMT <event> <callsign> results.txt` in the session folder,
    with the answers, both calibrations, every run's details and any warnings. Keep it.
-   **Save PDF report** writes `FMT report <callsign>.pdf` and opens it: a report to
+   **Save PDF report** writes `FMT <event> <callsign> report.pdf` and opens it: a report to
    share, with every reading used, the full working for each answer (mean, SD, SEM,
    drift, the dial check, the correction A + B x f and the carrier sum), the
    calibration fits, and charts of WWV Doppler during each calibration and the
@@ -660,7 +660,7 @@ way to learn what your station really achieves.
    - an error of more than 2 Hz is called a blunder (check the dial, the published
      frequency you typed, and the file) and kept out of the rest.
 5. **Copy AI prompt** puts a complete, self-contained prompt on the clipboard and saves
-   it as `FMT AI prompt.txt` in the session folder. Paste it into the AI chat you use.
+   it as `FMT <event> <callsign> AI prompt.txt` in the session folder. Paste it into the AI chat you use.
    It describes how the measurements were made, your frequency reference, both
    calibrations station by station, each run's readings around the carrier, the
    corrections, the published frequencies and the app's own notes, and asks for the
@@ -669,7 +669,7 @@ way to learn what your station really achieves.
    asked how good the measurements are likely to be.
 
 **Save report & show** adds an *Against the published frequencies* section to
-`FMT results.txt` once any are entered.
+`FMT <event> <callsign> results.txt` once any are entered.
 
 ## The screens explained
 
@@ -899,9 +899,9 @@ messages are warnings worth a look. **Blue** messages are information.
 | `6_calibration_after.all` | Calibration after the runs |
 | `session.json` | Your schedule, dial entries, choices and settings |
 | `IQ\<step> <UTC time> <dial> kHz.wav` and `.json` | FlexRadio IQ recordings and their description, if IQ recording is on |
-| `FMT results.txt` | The report, written when you press Save report |
-| `FMT report <callsign>.pdf` | The PDF report with all the working and charts, written when you press Save PDF report |
-| `FMT AI prompt.txt` | The AI prompt, written when you press Copy AI prompt or Show prompt |
+| `FMT <event> <callsign> results.txt` | The report, written when you press Save report |
+| `FMT <event> <callsign> report.pdf` | The PDF report with all the working and charts, written when you press Save PDF report |
+| `FMT <event> <callsign> AI prompt.txt` | The AI prompt, written when you press Copy AI prompt or Show prompt |
 | `*-replaced-*.all`, `*-removed-*.all` | Earlier files kept when you replace or remove one |
 | `Archive\<UTC time>_<file>.all` | A dated copy of every file captured or loaded, for example `Archive\20261113-023612Z_2_run1_W8RKO40m.all`. These are never overwritten or renamed, so the original readings of each step are always kept. |
 
