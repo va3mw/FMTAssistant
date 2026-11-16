@@ -19,6 +19,9 @@ type RunInput struct {
 	ErrHz   *float64
 	Capture *CaptureCheck // nil when unknown
 	Fading  *Fading       // nil when not checked
+	// Coverage compares the captured stretch with the whole minute when an
+	// IQ recording covers it; nil otherwise.
+	Coverage *Coverage
 }
 
 // RunNote is the analysis of one run.
@@ -238,6 +241,9 @@ func runNote(r RunInput, th Thresholds) RunNote {
 			share = "about half"
 		}
 		n.Lines = append(n.Lines, fmt.Sprintf("Only about %.0f s of the %.0f s key-down was captured, so this result rests on %s the available data, from the first part of the carrier only.", c.SpanSec, c.ExpectedSec, share))
+	}
+	if r.Coverage != nil {
+		n.Lines = append(n.Lines, r.Coverage.Msg)
 	}
 	return n
 }
